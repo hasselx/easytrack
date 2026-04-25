@@ -11,6 +11,12 @@ A static MVP prototype for uploading receipts, reviewing extracted expense data,
 - Manual correction before saving.
 - Local dashboard and transaction history.
 
+## Notes
+
+- The camera works best on the live HTTPS GitHub Pages URL.
+- Gallery uploads are downscaled before OCR to reduce browser memory use.
+- If OCR cannot read a receipt clearly, the app leaves fields editable instead of inserting fake values.
+
 ## Run locally
 
 Open `index.html` in a browser.

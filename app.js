@@ -79,7 +79,13 @@ const els = {
   pageLinks: Array.from(document.querySelectorAll("[data-page-link]")),
   pages: Array.from(document.querySelectorAll("[data-page]")),
   receiptInput: document.querySelector("#receiptInput"),
-  cameraInput: document.querySelector("#cameraInput"),
+  openCameraButton: document.querySelector("#openCameraButton"),
+  closeCameraButton: document.querySelector("#closeCameraButton"),
+  capturePhotoButton: document.querySelector("#capturePhotoButton"),
+  cameraPanel: document.querySelector("#cameraPanel"),
+  cameraVideo: document.querySelector("#cameraVideo"),
+  cameraCanvas: document.querySelector("#cameraCanvas"),
+  cameraError: document.querySelector("#cameraError"),
   dropZone: document.querySelector("#dropZone"),
   receiptPreview: document.querySelector("#receiptPreview"),
   receiptThumb: document.querySelector("#receiptThumb"),
@@ -109,6 +115,8 @@ const els = {
   steps: Array.from(document.querySelectorAll("#steps li")),
   seedButton: document.querySelector("#seedButton")
 };
+
+let cameraStream = null;
 
 function loadExpenses() {
   try {
@@ -201,15 +209,13 @@ function categorize(merchant) {
 }
 
 function fallbackExtraction(file) {
-  const picked = receiptExamples[Math.floor(Math.random() * receiptExamples.length)];
-  const date = todayISO();
   return {
-    merchant: picked.merchant,
-    date,
-    amount: picked.amount,
+    merchant: file.name.replace(/\.[^.]+$/, "") || "Unknown merchant",
+    date: todayISO(),
+    amount: "",
     currency: "EUR",
-    category: categorize(picked.merchant) || picked.category,
-    rawText: picked.rawText.replace("{date}", date).concat(`\nSource file: ${file.name}`)
+    category: "Other",
+    rawText: `Source file: ${file.name}`
   };
 }
 
@@ -242,25 +248,32 @@ function normalizeDate(value) {
 }
 
 function parseReceiptText(text, fileName = "") {
-  const lines = text
+  const cleanedText = text
+    .replace(/[|]/g, "1")
+    .replace(/[€]/g, " EUR ")
+    .replace(/\bO(?=\d)/g, "0")
+    .replace(/(?<=\d)O\b/g, "0");
+  const lines = cleanedText
     .split(/\r?\n/)
     .map((line) => line.replace(/\s{2,}/g, " ").trim())
     .filter(Boolean);
   const joined = lines.join("\n");
   const currency = /(?:€|eur)/i.test(joined) ? "EUR" : /\busd|\$/i.test(joined) ? "USD" : /\bgbp|£/i.test(joined) ? "GBP" : /\bchf\b/i.test(joined) ? "CHF" : "EUR";
   const dateMatch = joined.match(/\d{4}[-/.]\d{1,2}[-/.]\d{1,2}|\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}/);
-  const totalLine = lines.find((line) => /(total|summe|gesamt|betrag|zu zahlen|amount|balance|card payment)/i.test(line) && /[\d][\d\s.,]*\d/.test(line));
-  const totalSource = totalLine || [...lines].reverse().find((line) => /(?:€|eur|usd|gbp|chf|\$|£)?\s*\d+[\d\s]*(?:[,.]\d{2})/.test(line)) || "";
-  const amountMatch = totalSource.match(/(?:€|eur|usd|gbp|chf|\$|£)?\s*(\d[\d\s]*(?:[,.]\d{2}))/i);
+  const amountPattern = /(?:eur|usd|gbp|chf|\$|£)?\s*(\d{1,4}(?:[ .]\d{3})*(?:[,.]\d{2}))\s*(?:eur|usd|gbp|chf|\$|£)?/gi;
+  const keywordLines = lines.filter((line) => /(total|summe|gesamt|betrag|zu zahlen|amount|balance|karten?|cash|bar)/i.test(line));
+  const keywordAmounts = keywordLines.flatMap((line) => Array.from(line.matchAll(amountPattern)).map((match) => normalizeAmount(match[1])));
+  const allAmounts = Array.from(joined.matchAll(amountPattern)).map((match) => normalizeAmount(match[1])).filter(Boolean);
+  const amount = keywordAmounts.filter(Boolean).at(-1) || Math.max(0, ...allAmounts);
   const merchant = lines.find((line) => {
     const lower = line.toLowerCase();
-    return !/(receipt|beleg|bon|rechnung|tax|mwst|datum|date|total|summe|gesamt|eur|usd|gbp|chf)/i.test(lower) && /[a-zA-Z]{2,}/.test(line);
+    return !/(receipt|beleg|bon|rechnung|tax|mwst|datum|date|total|summe|gesamt|eur|usd|gbp|chf|tel|ust|vat|iban|karte|visa|mastercard)/i.test(lower) && /[a-zA-Z]{2,}/.test(line);
   }) || fileName.replace(/\.[^.]+$/, "") || "Unknown merchant";
 
   return {
     merchant,
     date: normalizeDate(dateMatch?.[0]) || todayISO(),
-    amount: normalizeAmount(amountMatch?.[1]) || "",
+    amount: amount || "",
     currency,
     category: categorize(merchant),
     rawText: text
@@ -272,7 +285,8 @@ async function runImageOcr(file) {
     throw new Error("OCR engine is still loading. Try again in a moment.");
   }
 
-  const result = await window.Tesseract.recognize(file, "eng+deu", {
+  const ocrImage = await prepareImageForOcr(file);
+  const result = await window.Tesseract.recognize(ocrImage, "eng", {
     logger(progress) {
       if (progress.status === "recognizing text") {
         setBadge(`${Math.round(progress.progress * 100)}%`, "busy");
@@ -281,6 +295,81 @@ async function runImageOcr(file) {
   });
 
   return result.data.text;
+}
+
+async function prepareImageForOcr(file) {
+  const bitmap = await createImageBitmap(file);
+  const maxSide = 1500;
+  const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+  const width = Math.max(1, Math.round(bitmap.width * scale));
+  const height = Math.max(1, Math.round(bitmap.height * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  ctx.drawImage(bitmap, 0, 0, width, height);
+
+  const imageData = ctx.getImageData(0, 0, width, height);
+  for (let index = 0; index < imageData.data.length; index += 4) {
+    const gray = imageData.data[index] * 0.299 + imageData.data[index + 1] * 0.587 + imageData.data[index + 2] * 0.114;
+    const contrast = gray > 170 ? 255 : gray < 80 ? 0 : gray;
+    imageData.data[index] = contrast;
+    imageData.data[index + 1] = contrast;
+    imageData.data[index + 2] = contrast;
+  }
+  ctx.putImageData(imageData, 0, 0);
+
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => resolve(blob || file), "image/jpeg", 0.86);
+  });
+}
+
+async function openCamera() {
+  els.cameraError.hidden = true;
+  els.cameraPanel.hidden = false;
+  setBadge("Camera", "busy");
+
+  try {
+    cameraStream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: { ideal: "environment" },
+        width: { ideal: 1280 },
+        height: { ideal: 960 }
+      },
+      audio: false
+    });
+    els.cameraVideo.srcObject = cameraStream;
+    await els.cameraVideo.play();
+  } catch (error) {
+    els.cameraError.textContent = "Camera could not open in this browser. Use Choose file from gallery instead.";
+    els.cameraError.hidden = false;
+    setBadge("Camera blocked", "ready");
+  }
+}
+
+function closeCamera() {
+  if (cameraStream) {
+    cameraStream.getTracks().forEach((track) => track.stop());
+    cameraStream = null;
+  }
+  els.cameraVideo.srcObject = null;
+  els.cameraPanel.hidden = true;
+  setBadge("Ready");
+}
+
+async function captureCameraPhoto() {
+  if (!cameraStream) return;
+  const width = els.cameraVideo.videoWidth || 1280;
+  const height = els.cameraVideo.videoHeight || 960;
+  els.cameraCanvas.width = width;
+  els.cameraCanvas.height = height;
+  els.cameraCanvas.getContext("2d").drawImage(els.cameraVideo, 0, 0, width, height);
+
+  const blob = await new Promise((resolve) => els.cameraCanvas.toBlob(resolve, "image/jpeg", 0.88));
+  if (!blob) return;
+  const file = new File([blob], `receipt-photo-${Date.now()}.jpg`, { type: "image/jpeg" });
+  closeCamera();
+  handleFile(file);
 }
 
 function populateForm(expense) {
@@ -355,7 +444,7 @@ async function handleFile(file) {
       extracted = parseReceiptText(text, file.name);
     } else {
       extracted = fallbackExtraction(file);
-      extracted.rawText = `${extracted.rawText}\n\nPDF OCR is not enabled in this static MVP. Review the fields before saving.`;
+      extracted.rawText = `${extracted.rawText}\n\nPDF OCR is not enabled in this static MVP. Enter the values manually before saving.`;
     }
 
     populateForm(extracted);
@@ -364,7 +453,7 @@ async function handleFile(file) {
     setPage("upload");
   } catch (error) {
     const extracted = fallbackExtraction(file);
-    extracted.rawText = `${extracted.rawText}\n\nOCR note: ${error.message}`;
+    extracted.rawText = `${extracted.rawText}\n\nOCR could not read this image: ${error.message}\nTry a brighter, closer photo or use the live HTTPS site instead of opening the local file.`;
     populateForm(extracted);
     setStep(2);
     setBadge("Review", "done");
@@ -534,10 +623,9 @@ els.receiptInput.addEventListener("change", (event) => {
   if (file) handleFile(file);
 });
 
-els.cameraInput.addEventListener("change", (event) => {
-  const [file] = event.target.files;
-  if (file) handleFile(file);
-});
+els.openCameraButton.addEventListener("click", openCamera);
+els.closeCameraButton.addEventListener("click", closeCamera);
+els.capturePhotoButton.addEventListener("click", captureCameraPhoto);
 
 els.expenseForm.addEventListener("submit", (event) => {
   event.preventDefault();

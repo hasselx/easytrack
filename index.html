@@ -126,11 +126,10 @@
               <span>or choose a file</span>
             </label>
 
-            <label class="camera-button">
-              <input id="cameraInput" type="file" accept="image/*" capture="environment" />
+            <button class="camera-button" id="openCameraButton" type="button">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h4l2-3h4l2 3h4v11H4V8Z" /><path d="M12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" /></svg>
               Take photo
-            </label>
+            </button>
 
             <div class="receipt-preview" id="receiptPreview" hidden>
               <div class="receipt-thumb" id="receiptThumb"></div>
@@ -138,6 +137,16 @@
                 <strong id="fileName"></strong>
                 <p id="fileMeta"></p>
               </div>
+            </div>
+
+            <div class="camera-panel" id="cameraPanel" hidden>
+              <video id="cameraVideo" autoplay playsinline muted></video>
+              <canvas id="cameraCanvas" width="1280" height="960" hidden></canvas>
+              <div class="camera-actions">
+                <button class="secondary-button" id="closeCameraButton" type="button">Close</button>
+                <button class="primary-button" id="capturePhotoButton" type="button">Use Photo</button>
+              </div>
+              <p id="cameraError" class="camera-error" hidden></p>
             </div>
           </article>
           </div>
