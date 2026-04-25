@@ -86,6 +86,134 @@ function normalizeParsedReceipt(receipt) {
   };
 }
 
+function normalizeAmount(value) {
+  if (!value) return "";
+  const compact = String(value).replace(/\s/g, "");
+  const commaIndex = compact.lastIndexOf(",");
+  const dotIndex = compact.lastIndexOf(".");
+  const decimalIndex = Math.max(commaIndex, dotIndex);
+  if (decimalIndex === -1) return Number(compact.replace(/[^\d]/g, ""));
+  const whole = compact.slice(0, decimalIndex).replace(/[^\d]/g, "");
+  const cents = compact.slice(decimalIndex + 1).replace(/[^\d]/g, "").slice(0, 2);
+  return Number(`${whole}.${cents.padEnd(2, "0")}`);
+}
+
+function normalizeDate(value) {
+  if (!value) return "";
+  const isoMatch = value.match(/(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
+  if (isoMatch) {
+    const [, year, month, day] = isoMatch;
+    return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+  }
+  const localMatch = value.match(/(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})/);
+  if (!localMatch) return "";
+  let [, day, month, year] = localMatch;
+  if (year.length === 2) year = `20${year}`;
+  return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+}
+
+function amountsInLine(line) {
+  const pattern = /(?:eur|usd|gbp|chf|\$|£)?\s*(\d{1,4}(?:[ .]\d{3})*(?:[,.]\d{2}))\s*(?:eur|usd|gbp|chf|\$|£)?/gi;
+  return Array.from(line.matchAll(pattern)).map((match) => normalizeAmount(match[1])).filter((amount) => Number.isFinite(amount));
+}
+
+function isReceiptMetadataLine(line) {
+  return /(summe|gesamt|total|betrag|zu zahlen|subtotal|zwischensumme|mwst|ust|vat|steuer|tax|visa|mastercard|maestro|amex|karte|card|ec-|girocard|bar|cash|gegeben|rueckgeld|rückgeld|zurueck|zurück|change|balance|datum|date|zeit|time|bon|beleg|rechnung|terminal|transaktion|trace|auth|iban|bic|ust-id|ustid|tel|telefon|phone|www\.|http|kunden|filiale|öffnungszeiten|oeffnungszeiten)/i.test(line);
+}
+
+function findTotalAmount(lines) {
+  const totalCandidates = [];
+  lines.forEach((line, index) => {
+    if (/(summe|gesamtbetrag|gesamt|total|zu zahlen)/i.test(line) && !/(rueckgeld|rückgeld|change|balance)/i.test(line)) {
+      totalCandidates.push(...amountsInLine([line, lines[index + 1] || "", lines[index - 1] || ""].join(" ")));
+    }
+  });
+  if (totalCandidates.length) return totalCandidates.at(-1);
+
+  const allAmounts = lines.flatMap(amountsInLine).filter((amount) => amount > 0 && amount < 10000);
+  return allAmounts.length ? Math.max(...allAmounts) : "";
+}
+
+function extractLineItems(lines) {
+  const items = [];
+  const priceAtEnd = /(\d{1,4}(?:[ .]\d{3})*(?:[,.]\d{2}))\s*[A-Z]?\s*$/i;
+
+  lines.forEach((line) => {
+    if (isReceiptMetadataLine(line) || !priceAtEnd.test(line)) return;
+    const amounts = amountsInLine(line);
+    const totalPrice = amounts.at(-1);
+    if (!totalPrice) return;
+
+    const quantityMatch = line.match(/(\d+(?:[,.]\d+)?)\s*[*xX]\s*\d{1,4}(?:[,.]\d{2})/);
+    const quantity = quantityMatch ? Number(quantityMatch[1].replace(",", ".")) : 1;
+    const itemName = line
+      .replace(priceAtEnd, "")
+      .replace(/\d+(?:[,.]\d+)?\s*[*xX]\s*\d{1,4}(?:[,.]\d{2})/g, "")
+      .replace(/^\d{3,}\s+/, "")
+      .replace(/\s{2,}/g, " ")
+      .trim();
+
+    if (!/[a-zA-ZÄÖÜäöüß]{2,}/.test(itemName)) return;
+    items.push({
+      item_name: itemName || "[Unclear]",
+      item_name_en: itemName || "[Unclear]",
+      quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
+      total_price: totalPrice,
+      unclear: !itemName
+    });
+  });
+
+  return items;
+}
+
+function parseReceiptByRules(text, fileName = "") {
+  const lines = text
+    .replace(/[|]/g, "1")
+    .replace(/[€]/g, " EUR ")
+    .replace(/\bO(?=\d)/g, "0")
+    .replace(/(?<=\d)O\b/g, "0")
+    .split(/\r?\n/)
+    .map((line) => line.replace(/\s{2,}/g, " ").trim())
+    .filter(Boolean);
+  const joined = lines.join("\n");
+  const merchant = lines.find((line) => !isReceiptMetadataLine(line) && /[a-zA-ZÄÖÜäöüß]{2,}/.test(line)) || fileName.replace(/\.[^.]+$/, "") || "Unknown merchant";
+  const dateMatch = joined.match(/\d{4}[-/.]\d{1,2}[-/.]\d{1,2}|\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}/);
+  const taxLine = lines.find((line) => /(tax|mwst|ust|vat)/i.test(line));
+  const cashLine = lines.find((line) => /(cash|bar|gegeben|received|tendered)/i.test(line));
+  const changeLine = lines.find((line) => /(change|rueckgeld|rückgeld|balance|zurueck|zurück)/i.test(line));
+  const paymentLine = lines.find((line) => /(visa|mastercard|maestro|amex|card|karte|ec|cash|bar|paypal|apple pay|google pay)/i.test(line));
+  const telephoneMatch = joined.match(/(?:tel\.?|telefon|phone)[:\s]*([+()0-9][+()0-9\s/-]{5,})/i) || joined.match(/(\+?\d[\d\s()/.-]{7,}\d)/);
+  const addressLine = lines.find((line) => /\b\d{5}\b/.test(line) || /\b(strasse|straße|str\.|platz|allee|road|street|st\.)\b/i.test(line));
+
+  return normalizeParsedReceipt({
+    merchant,
+    date: normalizeDate(dateMatch?.[0]),
+    time: joined.match(/\b([01]?\d|2[0-3]):[0-5]\d\b/)?.[0] || "",
+    amount: findTotalAmount(lines),
+    currency: /(?:eur)/i.test(joined) ? "EUR" : "EUR",
+    category: "Other",
+    tax: amountsInLine(taxLine || "").at(-1) ?? -1,
+    payment_method: paymentLine || "",
+    cash_paid: amountsInLine(cashLine || "").at(-1) ?? -1,
+    change_amount: amountsInLine(changeLine || "").at(-1) ?? -1,
+    telephone: telephoneMatch?.[1]?.trim() || "",
+    address: addressLine || "",
+    line_items: extractLineItems(lines),
+    notes: ""
+  });
+}
+
+function mergeParsedReceipt(aiParsed, ruleParsed) {
+  const merged = { ...ruleParsed, ...aiParsed };
+  ["merchant", "date", "time", "amount", "currency", "tax", "payment_method", "cash_paid", "change_amount", "telephone", "address"].forEach((key) => {
+    if (merged[key] === "" || merged[key] == null) merged[key] = ruleParsed[key];
+  });
+  if (!Array.isArray(merged.line_items) || merged.line_items.length === 0) {
+    merged.line_items = ruleParsed.line_items;
+  }
+  return normalizeParsedReceipt(merged);
+}
+
 function receiptPrompt(text, fileName) {
   return `Extract structured receipt expense data as valid JSON only.
 
@@ -237,6 +365,8 @@ export default async function handler(request, response) {
     return response.status(400).json({ error: "Missing OCR text payload." });
   }
 
+  const ruleParsed = parseReceiptByRules(text, request.body?.fileName);
+
   try {
     let parsed;
     let provider = "";
@@ -247,8 +377,12 @@ export default async function handler(request, response) {
       parsed = await parseWithOpenAI(text, request.body?.fileName);
       provider = "openai";
     }
-    return response.status(200).json({ ...parsed, provider });
+    return response.status(200).json({ ...mergeParsedReceipt(parsed, ruleParsed), provider });
   } catch (error) {
-    return response.status(502).json({ error: error.message || "AI receipt parser failed." });
+    return response.status(200).json({
+      ...ruleParsed,
+      provider: "rules",
+      notes: `AI parser fallback used: ${error.message || "AI receipt parser failed."}`
+    });
   }
 }
