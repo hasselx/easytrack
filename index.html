@@ -290,25 +290,21 @@
             <div class="panel-header">
               <div>
                 <h2 id="visionTitle">Google Cloud Vision OCR</h2>
-                <p>Your API key is stored only in this browser and is not committed to GitHub.</p>
+                <p>The API key belongs in the server environment as GOOGLE_VISION_API_KEY.</p>
               </div>
-              <span id="visionStatus" class="badge">Not connected</span>
+              <span id="visionStatus" class="badge">Server endpoint</span>
             </div>
 
-            <form id="visionForm" class="settings-form">
+            <div class="settings-form">
               <label>
-                API key
-                <input id="visionApiKey" name="visionApiKey" type="password" autocomplete="off" placeholder="Paste Google Cloud Vision API key" />
+                OCR endpoint
+                <input value="/api/vision-ocr" readonly />
               </label>
-              <div class="form-actions">
-                <button class="secondary-button" id="clearVisionKeyButton" type="button">Clear key</button>
-                <button class="primary-button" type="submit">Save key</button>
-              </div>
-            </form>
+            </div>
 
             <div class="trust-note">
-              <strong>Receipt images are sent to Google only when this key is saved.</strong>
-              <p>For a public production app, use a backend proxy instead of exposing an API key in browser code.</p>
+              <strong>The browser never sees the Google API key.</strong>
+              <p>Deploy with a serverless host such as Vercel and add GOOGLE_VISION_API_KEY in the project environment variables.</p>
             </div>
           </article>
         </section>

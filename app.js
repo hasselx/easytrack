@@ -1,6 +1,4 @@
 const STORAGE_KEY = "receiptflow.expenses.v1";
-const VISION_KEY_STORAGE = "receiptflow.googleVisionApiKey.v1";
-
 const categoryColors = {
   Food: "#2f8f68",
   Travel: "#167d8f",
@@ -101,10 +99,7 @@ const els = {
   category: document.querySelector("#category"),
   rawText: document.querySelector("#rawText"),
   resetFormButton: document.querySelector("#resetFormButton"),
-  visionForm: document.querySelector("#visionForm"),
-  visionApiKey: document.querySelector("#visionApiKey"),
   visionStatus: document.querySelector("#visionStatus"),
-  clearVisionKeyButton: document.querySelector("#clearVisionKeyButton"),
   monthlyTotal: document.querySelector("#monthlyTotal"),
   monthlyCount: document.querySelector("#monthlyCount"),
   averageReceipt: document.querySelector("#averageReceipt"),
@@ -135,16 +130,10 @@ function saveExpenses() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state.expenses));
 }
 
-function getVisionApiKey() {
-  return localStorage.getItem(VISION_KEY_STORAGE) || "";
-}
-
 function updateVisionSettings() {
-  const hasKey = Boolean(getVisionApiKey());
-  els.visionStatus.textContent = hasKey ? "Connected" : "Not connected";
-  els.visionStatus.style.background = hasKey ? "#e8f4ed" : "#eef1ed";
-  els.visionStatus.style.color = hasKey ? "#2f8f68" : "#66717a";
-  els.visionApiKey.placeholder = hasKey ? "Saved locally. Paste a new key to replace it." : "Paste Google Cloud Vision API key";
+  els.visionStatus.textContent = location.protocol === "file:" ? "Needs deployed server" : "Server endpoint";
+  els.visionStatus.style.background = location.protocol === "file:" ? "#fff7e6" : "#e8f4ed";
+  els.visionStatus.style.color = location.protocol === "file:" ? "#8a5d08" : "#2f8f68";
 }
 
 function formatMoney(amount, currency = "EUR") {
@@ -299,9 +288,10 @@ function parseReceiptText(text, fileName = "") {
 
 async function runImageOcr(file) {
   const ocrImage = await prepareImageForOcr(file);
-  const visionApiKey = getVisionApiKey();
-  if (visionApiKey) {
-    return runGoogleVisionOcr(ocrImage, visionApiKey);
+  try {
+    return await runServerVisionOcr(ocrImage);
+  } catch (error) {
+    console.info("Server OCR unavailable, falling back to browser OCR.", error);
   }
 
   if (!window.Tesseract) {
@@ -328,35 +318,23 @@ function blobToBase64(blob) {
   });
 }
 
-async function runGoogleVisionOcr(imageBlob, apiKey) {
+async function runServerVisionOcr(imageBlob) {
   setBadge("Google OCR", "busy");
   const content = await blobToBase64(imageBlob);
-  const response = await fetch(`https://vision.googleapis.com/v1/images:annotate?key=${encodeURIComponent(apiKey)}`, {
+  const response = await fetch("/api/vision-ocr", {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
     },
-    body: JSON.stringify({
-      requests: [
-        {
-          image: { content },
-          features: [{ type: "TEXT_DETECTION" }]
-        }
-      ]
-    })
+    body: JSON.stringify({ image: content })
   });
   const payload = await response.json();
 
   if (!response.ok || payload.error) {
-    throw new Error(payload.error?.message || "Google Vision OCR failed.");
+    throw new Error(payload.error || "Server OCR failed.");
   }
 
-  const result = payload.responses?.[0];
-  if (result?.error) {
-    throw new Error(result.error.message || "Google Vision could not read this image.");
-  }
-
-  return result?.textAnnotations?.[0]?.description || "";
+  return payload.text || "";
 }
 
 async function prepareImageForOcr(file) {
