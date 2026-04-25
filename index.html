@@ -336,7 +336,7 @@
             <div class="panel-header">
               <div>
                 <h2 id="parserTitle">AI Receipt Parser</h2>
-                <p>Understands OCR text and separates totals, tax, cash, change, address, telephone, and payment method.</p>
+                <p>Uses Hugging Face or OpenAI on the server to separate totals, tax, cash, change, address, telephone, and payment method.</p>
               </div>
               <span id="parserStatus" class="badge">Server endpoint</span>
             </div>
@@ -349,8 +349,8 @@
             </div>
 
             <div class="trust-note">
-              <strong>The OpenAI key belongs on the server.</strong>
-              <p>Add OPENAI_API_KEY in Vercel. The browser sends only OCR text to your server endpoint.</p>
+              <strong>The AI key belongs on the server.</strong>
+              <p>Add HUGGINGFACE_API_KEY in Vercel. OPENAI_API_KEY is optional as a fallback.</p>
             </div>
           </article>
         </section>

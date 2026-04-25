@@ -179,7 +179,8 @@ function updateParserSettings() {
   fetch("/api/parse-receipt")
     .then((response) => response.json())
     .then((payload) => {
-      setStatusBadge(els.parserStatus, payload.configured ? "Connected" : "Missing key", payload.configured ? "ok" : "warn");
+      const provider = payload.provider === "huggingface" ? "Hugging Face" : payload.provider === "openai" ? "OpenAI" : "";
+      setStatusBadge(els.parserStatus, payload.configured ? provider : "Missing key", payload.configured ? "ok" : "warn");
     })
     .catch(() => {
       setStatusBadge(els.parserStatus, "Server unavailable", "bad");
