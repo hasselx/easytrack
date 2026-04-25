@@ -7,10 +7,12 @@
     <title>Receipt-Based Expense Tracker</title>
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="stylesheet" href="styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js" defer></script>
   </head>
   <body>
     <div class="app-shell">
-      <aside class="sidebar" aria-label="Primary">
+      <div class="scrim" id="scrim" hidden></div>
+      <aside class="sidebar" id="sidebar" aria-label="Primary">
         <div class="brand">
           <div class="brand-mark" aria-hidden="true">
             <svg viewBox="0 0 24 24" role="img">
@@ -25,15 +27,15 @@
         </div>
 
         <nav class="nav-list" aria-label="Sections">
-          <a href="#dashboard" class="active">
+          <a href="#dashboard" class="active" data-page-link="dashboard">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13h6V4H4v9Zm10 7h6V4h-6v16ZM4 20h6v-5H4v5Z" /></svg>
             Dashboard
           </a>
-          <a href="#upload">
+          <a href="#upload" data-page-link="upload">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0 4.5 4.5M12 4 7.5 8.5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" /></svg>
             Upload
           </a>
-          <a href="#transactions">
+          <a href="#transactions" data-page-link="transactions">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14M5 12h14M5 19h14" /></svg>
             Transactions
           </a>
@@ -49,35 +51,42 @@
       </aside>
 
       <main>
-        <header class="topbar">
-          <div>
-            <h1>Receipt-Based Expense Tracker</h1>
-            <p>Upload receipts, review extracted fields, and watch the dashboard update.</p>
-          </div>
+        <header class="mobile-appbar">
+          <button class="icon-button" id="menuButton" type="button" title="Open menu" aria-label="Open menu" aria-controls="sidebar">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
+          </button>
+          <strong id="pageTitle">Dashboard</strong>
           <button class="icon-button" id="seedButton" type="button" title="Load sample data" aria-label="Load sample data">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M7 4v6M17 4v6M6 14h12M8 18h8" /></svg>
           </button>
         </header>
 
-        <section id="dashboard" class="section-grid metrics-grid" aria-label="Dashboard metrics">
-          <article class="metric">
-            <span>Monthly spend</span>
-            <strong id="monthlyTotal">€0.00</strong>
-            <small id="monthlyCount">0 expenses this month</small>
-          </article>
-          <article class="metric">
-            <span>Average receipt</span>
-            <strong id="averageReceipt">€0.00</strong>
-            <small>Based on saved expenses</small>
-          </article>
-          <article class="metric">
-            <span>Top category</span>
-            <strong id="topCategory">None</strong>
-            <small id="topCategoryAmount">No category data yet</small>
-          </article>
-        </section>
+        <section class="app-page active" id="dashboard" data-page="dashboard">
+          <header class="topbar">
+            <div>
+              <h1>Dashboard</h1>
+              <p>Track spending from confirmed receipt entries.</p>
+            </div>
+          </header>
 
-        <section class="content-grid">
+          <div class="section-grid metrics-grid" aria-label="Dashboard metrics">
+            <article class="metric">
+              <span>Monthly spend</span>
+              <strong id="monthlyTotal">€0.00</strong>
+              <small id="monthlyCount">0 expenses this month</small>
+            </article>
+            <article class="metric">
+              <span>Average receipt</span>
+              <strong id="averageReceipt">€0.00</strong>
+              <small>Based on saved expenses</small>
+            </article>
+            <article class="metric">
+              <span>Top category</span>
+              <strong id="topCategory">None</strong>
+              <small id="topCategoryAmount">No category data yet</small>
+            </article>
+          </div>
+
           <article class="panel chart-panel" aria-labelledby="categoryChartTitle">
             <div class="panel-header">
               <div>
@@ -90,12 +99,22 @@
               <div id="chartLegend" class="legend"></div>
             </div>
           </article>
+        </section>
 
-          <article class="panel upload-panel" id="upload" aria-labelledby="uploadTitle">
+        <section class="app-page" id="upload" data-page="upload">
+          <header class="topbar">
+            <div>
+              <h1>Scan Receipt</h1>
+              <p>Upload or take a photo, then review detected values.</p>
+            </div>
+          </header>
+
+          <div class="content-grid upload-grid">
+            <article class="panel upload-panel" aria-labelledby="uploadTitle">
             <div class="panel-header">
               <div>
                 <h2 id="uploadTitle">Receipt Upload</h2>
-                <p>JPG, PNG, or PDF up to 10 MB</p>
+                <p>Images are OCR scanned in the browser. PDFs use fallback parsing for now.</p>
               </div>
               <span id="processingBadge" class="badge">Ready</span>
             </div>
@@ -107,6 +126,12 @@
               <span>or choose a file</span>
             </label>
 
+            <label class="camera-button">
+              <input id="cameraInput" type="file" accept="image/*" capture="environment" />
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h4l2-3h4l2 3h4v11H4V8Z" /><path d="M12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" /></svg>
+              Take photo
+            </label>
+
             <div class="receipt-preview" id="receiptPreview" hidden>
               <div class="receipt-thumb" id="receiptThumb"></div>
               <div>
@@ -115,10 +140,10 @@
               </div>
             </div>
           </article>
-        </section>
+          </div>
 
-        <section class="content-grid review-grid">
-          <article class="panel" aria-labelledby="reviewTitle">
+          <div class="content-grid review-grid">
+            <article class="panel" aria-labelledby="reviewTitle">
             <div class="panel-header">
               <div>
                 <h2 id="reviewTitle">Review Extracted Data</h2>
@@ -171,7 +196,7 @@
             </form>
           </article>
 
-          <article class="panel insights-panel" aria-labelledby="workflowTitle">
+            <article class="panel insights-panel" aria-labelledby="workflowTitle">
             <div class="panel-header">
               <div>
                 <h2 id="workflowTitle">Processing Flow</h2>
@@ -189,9 +214,18 @@
               <p>Saved expenses only update the dashboard after you confirm the extracted data.</p>
             </div>
           </article>
+          </div>
         </section>
 
-        <section class="panel transactions-panel" id="transactions" aria-labelledby="transactionsTitle">
+        <section class="app-page" id="transactions" data-page="transactions">
+          <header class="topbar">
+            <div>
+              <h1>Transactions</h1>
+              <p>Filter, edit, and manage saved expenses.</p>
+            </div>
+          </header>
+
+          <article class="panel transactions-panel" aria-labelledby="transactionsTitle">
           <div class="panel-header transaction-header">
             <div>
               <h2 id="transactionsTitle">Recent Transactions</h2>
@@ -228,6 +262,7 @@
             </table>
           </div>
           <p id="emptyState" class="empty-state">No expenses yet. Upload a receipt or load sample data.</p>
+          </article>
         </section>
       </main>
     </div>

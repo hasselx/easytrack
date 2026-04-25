@@ -67,11 +67,19 @@ const receiptExamples = [
 const state = {
   expenses: loadExpenses(),
   activeReceiptUrl: "",
-  editingId: null
+  editingId: null,
+  activePage: "dashboard"
 };
 
 const els = {
+  sidebar: document.querySelector("#sidebar"),
+  scrim: document.querySelector("#scrim"),
+  menuButton: document.querySelector("#menuButton"),
+  pageTitle: document.querySelector("#pageTitle"),
+  pageLinks: Array.from(document.querySelectorAll("[data-page-link]")),
+  pages: Array.from(document.querySelectorAll("[data-page]")),
   receiptInput: document.querySelector("#receiptInput"),
+  cameraInput: document.querySelector("#cameraInput"),
   dropZone: document.querySelector("#dropZone"),
   receiptPreview: document.querySelector("#receiptPreview"),
   receiptThumb: document.querySelector("#receiptThumb"),
@@ -141,6 +149,27 @@ function setBadge(text, mode = "ready") {
   els.processingBadge.style.color = ink;
 }
 
+function setPage(page) {
+  const knownPage = els.pages.some((item) => item.dataset.page === page) ? page : "dashboard";
+  state.activePage = knownPage;
+  els.pages.forEach((item) => item.classList.toggle("active", item.dataset.page === knownPage));
+  els.pageLinks.forEach((link) => link.classList.toggle("active", link.dataset.pageLink === knownPage));
+  els.pageTitle.textContent = knownPage === "upload" ? "Scan Receipt" : knownPage[0].toUpperCase() + knownPage.slice(1);
+  closeMenu();
+}
+
+function openMenu() {
+  document.body.classList.add("menu-open");
+  els.scrim.hidden = false;
+  els.menuButton.setAttribute("aria-expanded", "true");
+}
+
+function closeMenu() {
+  document.body.classList.remove("menu-open");
+  els.scrim.hidden = true;
+  els.menuButton.setAttribute("aria-expanded", "false");
+}
+
 function setStep(index) {
   els.steps.forEach((step, stepIndex) => {
     step.classList.toggle("done", stepIndex <= index);
@@ -171,7 +200,7 @@ function categorize(merchant) {
   return "Other";
 }
 
-function simulateExtraction(file) {
+function fallbackExtraction(file) {
   const picked = receiptExamples[Math.floor(Math.random() * receiptExamples.length)];
   const date = todayISO();
   return {
@@ -182,6 +211,76 @@ function simulateExtraction(file) {
     category: categorize(picked.merchant) || picked.category,
     rawText: picked.rawText.replace("{date}", date).concat(`\nSource file: ${file.name}`)
   };
+}
+
+function normalizeAmount(value) {
+  if (!value) return "";
+  const compact = value.replace(/\s/g, "");
+  const commaIndex = compact.lastIndexOf(",");
+  const dotIndex = compact.lastIndexOf(".");
+  const decimalIndex = Math.max(commaIndex, dotIndex);
+  if (decimalIndex === -1) return Number(compact.replace(/[^\d]/g, ""));
+  const whole = compact.slice(0, decimalIndex).replace(/[^\d]/g, "");
+  const cents = compact.slice(decimalIndex + 1).replace(/[^\d]/g, "").slice(0, 2);
+  return Number(`${whole}.${cents.padEnd(2, "0")}`);
+}
+
+function normalizeDate(value) {
+  if (!value) return "";
+  const cleaned = value.trim();
+  const isoMatch = cleaned.match(/(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
+  if (isoMatch) {
+    const [, year, month, day] = isoMatch;
+    return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+  }
+
+  const localMatch = cleaned.match(/(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})/);
+  if (!localMatch) return "";
+  let [, day, month, year] = localMatch;
+  if (year.length === 2) year = `20${year}`;
+  return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+}
+
+function parseReceiptText(text, fileName = "") {
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => line.replace(/\s{2,}/g, " ").trim())
+    .filter(Boolean);
+  const joined = lines.join("\n");
+  const currency = /(?:€|eur)/i.test(joined) ? "EUR" : /\busd|\$/i.test(joined) ? "USD" : /\bgbp|£/i.test(joined) ? "GBP" : /\bchf\b/i.test(joined) ? "CHF" : "EUR";
+  const dateMatch = joined.match(/\d{4}[-/.]\d{1,2}[-/.]\d{1,2}|\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}/);
+  const totalLine = lines.find((line) => /(total|summe|gesamt|betrag|zu zahlen|amount|balance|card payment)/i.test(line) && /[\d][\d\s.,]*\d/.test(line));
+  const totalSource = totalLine || [...lines].reverse().find((line) => /(?:€|eur|usd|gbp|chf|\$|£)?\s*\d+[\d\s]*(?:[,.]\d{2})/.test(line)) || "";
+  const amountMatch = totalSource.match(/(?:€|eur|usd|gbp|chf|\$|£)?\s*(\d[\d\s]*(?:[,.]\d{2}))/i);
+  const merchant = lines.find((line) => {
+    const lower = line.toLowerCase();
+    return !/(receipt|beleg|bon|rechnung|tax|mwst|datum|date|total|summe|gesamt|eur|usd|gbp|chf)/i.test(lower) && /[a-zA-Z]{2,}/.test(line);
+  }) || fileName.replace(/\.[^.]+$/, "") || "Unknown merchant";
+
+  return {
+    merchant,
+    date: normalizeDate(dateMatch?.[0]) || todayISO(),
+    amount: normalizeAmount(amountMatch?.[1]) || "",
+    currency,
+    category: categorize(merchant),
+    rawText: text
+  };
+}
+
+async function runImageOcr(file) {
+  if (!window.Tesseract) {
+    throw new Error("OCR engine is still loading. Try again in a moment.");
+  }
+
+  const result = await window.Tesseract.recognize(file, "eng+deu", {
+    logger(progress) {
+      if (progress.status === "recognizing text") {
+        setBadge(`${Math.round(progress.progress * 100)}%`, "busy");
+      }
+    }
+  });
+
+  return result.data.text;
 }
 
 function populateForm(expense) {
@@ -235,7 +334,7 @@ function showFilePreview(file) {
   }
 }
 
-function handleFile(file) {
+async function handleFile(file) {
   try {
     validateFile(file);
   } catch (error) {
@@ -245,19 +344,31 @@ function handleFile(file) {
 
   showFilePreview(file);
   setStep(0);
-  setBadge("OCR", "busy");
+  setBadge(file.type.startsWith("image/") ? "Scanning" : "PDF fallback", "busy");
 
-  window.setTimeout(() => {
-    setStep(1);
-    setBadge("Parsing", "busy");
-  }, 500);
+  try {
+    let extracted;
+    if (file.type.startsWith("image/")) {
+      const text = await runImageOcr(file);
+      setStep(1);
+      setBadge("Parsing", "busy");
+      extracted = parseReceiptText(text, file.name);
+    } else {
+      extracted = fallbackExtraction(file);
+      extracted.rawText = `${extracted.rawText}\n\nPDF OCR is not enabled in this static MVP. Review the fields before saving.`;
+    }
 
-  window.setTimeout(() => {
-    const extracted = simulateExtraction(file);
     populateForm(extracted);
     setStep(2);
     setBadge("Review", "done");
-  }, 1000);
+    setPage("upload");
+  } catch (error) {
+    const extracted = fallbackExtraction(file);
+    extracted.rawText = `${extracted.rawText}\n\nOCR note: ${error.message}`;
+    populateForm(extracted);
+    setStep(2);
+    setBadge("Review", "done");
+  }
 }
 
 function filteredExpenses() {
@@ -379,6 +490,29 @@ function render() {
   renderTransactions(expenses);
 }
 
+els.menuButton.addEventListener("click", () => {
+  if (document.body.classList.contains("menu-open")) {
+    closeMenu();
+  } else {
+    openMenu();
+  }
+});
+
+els.scrim.addEventListener("click", closeMenu);
+
+els.pageLinks.forEach((link) => {
+  link.addEventListener("click", (event) => {
+    event.preventDefault();
+    const page = link.dataset.pageLink;
+    history.pushState(null, "", `#${page}`);
+    setPage(page);
+  });
+});
+
+window.addEventListener("popstate", () => {
+  setPage(location.hash.replace("#", "") || "dashboard");
+});
+
 els.dropZone.addEventListener("dragover", (event) => {
   event.preventDefault();
   els.dropZone.classList.add("dragging");
@@ -396,6 +530,11 @@ els.dropZone.addEventListener("drop", (event) => {
 });
 
 els.receiptInput.addEventListener("change", (event) => {
+  const [file] = event.target.files;
+  if (file) handleFile(file);
+});
+
+els.cameraInput.addEventListener("change", (event) => {
   const [file] = event.target.files;
   if (file) handleFile(file);
 });
@@ -448,6 +587,8 @@ els.transactionsBody.addEventListener("click", (event) => {
     });
     setBadge("Editing", "busy");
     setStep(2);
+    history.pushState(null, "", "#upload");
+    setPage("upload");
     document.querySelector("#reviewTitle").scrollIntoView({ behavior: "smooth" });
   }
 
@@ -472,4 +613,5 @@ els.seedButton.addEventListener("click", () => {
 });
 
 clearForm();
+setPage(location.hash.replace("#", "") || "dashboard");
 render();

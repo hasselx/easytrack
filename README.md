@@ -2,6 +2,15 @@
 
 A static MVP prototype for uploading receipts, reviewing extracted expense data, and viewing spending in a dashboard.
 
+## Features
+
+- Mobile-style app navigation with a hamburger menu.
+- Upload a receipt image, choose a file, or take a photo on mobile.
+- Browser-side OCR for JPG/PNG receipts using Tesseract.js.
+- Automatic parsing for merchant, date, amount, currency, and category.
+- Manual correction before saving.
+- Local dashboard and transaction history.
+
 ## Run locally
 
 Open `index.html` in a browser.
@@ -25,4 +34,3 @@ git push -u origin main
    - Branch: **main**
    - Folder: **/** root
 7. Save. GitHub will provide the live URL after deployment.
-
