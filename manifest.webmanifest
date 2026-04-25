@@ -1,0 +1,10 @@
+{
+  "name": "Receipt-Based Expense Tracker",
+  "short_name": "ReceiptFlow",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f6f7f4",
+  "theme_color": "#182027",
+  "description": "Upload receipts, review extracted fields, and track expenses in a dashboard.",
+  "icons": []
+}

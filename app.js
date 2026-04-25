@@ -1,0 +1,475 @@
+const STORAGE_KEY = "receiptflow.expenses.v1";
+
+const categoryColors = {
+  Food: "#2f8f68",
+  Travel: "#167d8f",
+  Shopping: "#4b6fb8",
+  Health: "#c0564a",
+  Housing: "#8b6f47",
+  Utilities: "#c38a16",
+  Other: "#66717a"
+};
+
+const sampleReceipts = [
+  {
+    merchant: "REWE Berlin Mitte",
+    date: "2026-04-21",
+    amount: 32.48,
+    currency: "EUR",
+    category: "Food",
+    rawText: "REWE Berlin Mitte\nBon Nr. 4821\n21.04.2026\nSumme EUR 32,48\nVielen Dank fuer Ihren Einkauf"
+  },
+  {
+    merchant: "BVG Fahrinfo",
+    date: "2026-04-18",
+    amount: 3.50,
+    currency: "EUR",
+    category: "Travel",
+    rawText: "BVG\nEinzelfahrschein Berlin AB\n18.04.2026\nTotal 3,50 EUR"
+  },
+  {
+    merchant: "dm drogerie markt",
+    date: "2026-04-12",
+    amount: 18.95,
+    currency: "EUR",
+    category: "Health",
+    rawText: "dm drogerie markt\n12.04.2026\nGesamtbetrag 18,95 EUR"
+  }
+];
+
+const receiptExamples = [
+  {
+    merchant: "EDEKA Friedrichstrasse",
+    amount: 27.84,
+    category: "Food",
+    rawText: "EDEKA Friedrichstrasse\nKassenbon\nDatum {date}\nMilch 1,49\nBrot 2,79\nObst 4,20\nGesamt EUR 27,84"
+  },
+  {
+    merchant: "DB Reisezentrum",
+    amount: 49.90,
+    category: "Travel",
+    rawText: "Deutsche Bahn\nReisezentrum Berlin Hbf\nDatum {date}\nTicket ICE\nTotal 49,90 EUR"
+  },
+  {
+    merchant: "MediaMarkt",
+    amount: 89.99,
+    category: "Shopping",
+    rawText: "MediaMarkt\nBeleg\nDatum {date}\nZubehoer\nSumme 89,99 EUR"
+  },
+  {
+    merchant: "Apotheke am Markt",
+    amount: 14.60,
+    category: "Health",
+    rawText: "Apotheke am Markt\nDatum {date}\nMwSt enthalten\nZu zahlen 14,60 EUR"
+  }
+];
+
+const state = {
+  expenses: loadExpenses(),
+  activeReceiptUrl: "",
+  editingId: null
+};
+
+const els = {
+  receiptInput: document.querySelector("#receiptInput"),
+  dropZone: document.querySelector("#dropZone"),
+  receiptPreview: document.querySelector("#receiptPreview"),
+  receiptThumb: document.querySelector("#receiptThumb"),
+  fileName: document.querySelector("#fileName"),
+  fileMeta: document.querySelector("#fileMeta"),
+  processingBadge: document.querySelector("#processingBadge"),
+  expenseForm: document.querySelector("#expenseForm"),
+  merchant: document.querySelector("#merchant"),
+  date: document.querySelector("#date"),
+  amount: document.querySelector("#amount"),
+  currency: document.querySelector("#currency"),
+  category: document.querySelector("#category"),
+  rawText: document.querySelector("#rawText"),
+  resetFormButton: document.querySelector("#resetFormButton"),
+  monthlyTotal: document.querySelector("#monthlyTotal"),
+  monthlyCount: document.querySelector("#monthlyCount"),
+  averageReceipt: document.querySelector("#averageReceipt"),
+  topCategory: document.querySelector("#topCategory"),
+  topCategoryAmount: document.querySelector("#topCategoryAmount"),
+  categoryChart: document.querySelector("#categoryChart"),
+  chartLegend: document.querySelector("#chartLegend"),
+  transactionsBody: document.querySelector("#transactionsBody"),
+  emptyState: document.querySelector("#emptyState"),
+  filterStart: document.querySelector("#filterStart"),
+  filterEnd: document.querySelector("#filterEnd"),
+  filterCategory: document.querySelector("#filterCategory"),
+  steps: Array.from(document.querySelectorAll("#steps li")),
+  seedButton: document.querySelector("#seedButton")
+};
+
+function loadExpenses() {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+  } catch {
+    return [];
+  }
+}
+
+function saveExpenses() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state.expenses));
+}
+
+function formatMoney(amount, currency = "EUR") {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency
+  }).format(Number(amount) || 0);
+}
+
+function formatDate(date) {
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric"
+  }).format(new Date(`${date}T12:00:00`));
+}
+
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function setBadge(text, mode = "ready") {
+  els.processingBadge.textContent = text;
+  const color = mode === "busy" ? "#fff7e6" : mode === "done" ? "#e8f4ed" : "#eef1ed";
+  const ink = mode === "busy" ? "#8a5d08" : mode === "done" ? "#2f8f68" : "#66717a";
+  els.processingBadge.style.background = color;
+  els.processingBadge.style.color = ink;
+}
+
+function setStep(index) {
+  els.steps.forEach((step, stepIndex) => {
+    step.classList.toggle("done", stepIndex <= index);
+  });
+}
+
+function createExpense(data) {
+  return {
+    id: crypto.randomUUID(),
+    user_id: "local-user",
+    merchant: data.merchant,
+    date: data.date,
+    amount: Number(data.amount),
+    currency: data.currency,
+    category: data.category,
+    raw_text: data.rawText,
+    receipt_url: data.receiptUrl || "",
+    created_at: new Date().toISOString()
+  };
+}
+
+function categorize(merchant) {
+  const text = merchant.toLowerCase();
+  if (/(rewe|edeka|aldi|lidl|kaufland|grocery|market)/.test(text)) return "Food";
+  if (/(bvg|db|uber|bahn|taxi|train|flight)/.test(text)) return "Travel";
+  if (/(dm|apotheke|pharmacy|arzt)/.test(text)) return "Health";
+  if (/(media|amazon|store|shop)/.test(text)) return "Shopping";
+  return "Other";
+}
+
+function simulateExtraction(file) {
+  const picked = receiptExamples[Math.floor(Math.random() * receiptExamples.length)];
+  const date = todayISO();
+  return {
+    merchant: picked.merchant,
+    date,
+    amount: picked.amount,
+    currency: "EUR",
+    category: categorize(picked.merchant) || picked.category,
+    rawText: picked.rawText.replace("{date}", date).concat(`\nSource file: ${file.name}`)
+  };
+}
+
+function populateForm(expense) {
+  els.merchant.value = expense.merchant || "";
+  els.date.value = expense.date || todayISO();
+  els.amount.value = expense.amount || "";
+  els.currency.value = expense.currency || "EUR";
+  els.category.value = expense.category || "Other";
+  els.rawText.value = expense.rawText || expense.raw_text || "";
+}
+
+function clearForm() {
+  state.editingId = null;
+  state.activeReceiptUrl = "";
+  els.expenseForm.reset();
+  els.currency.value = "EUR";
+  els.category.value = "Food";
+  els.rawText.value = "";
+  els.receiptPreview.hidden = true;
+  els.receiptThumb.innerHTML = "";
+  setBadge("Ready");
+  setStep(0);
+}
+
+function validateFile(file) {
+  const allowed = ["image/png", "image/jpeg", "application/pdf"];
+  if (!allowed.includes(file.type)) {
+    throw new Error("Unsupported file type. Use JPG, PNG, or PDF.");
+  }
+  if (file.size > 10 * 1024 * 1024) {
+    throw new Error("File is larger than 10 MB.");
+  }
+}
+
+function showFilePreview(file) {
+  els.receiptPreview.hidden = false;
+  els.fileName.textContent = file.name;
+  els.fileMeta.textContent = `${file.type || "Unknown type"} · ${(file.size / 1024 / 1024).toFixed(2)} MB`;
+  els.receiptThumb.innerHTML = "";
+
+  if (file.type.startsWith("image/")) {
+    const img = document.createElement("img");
+    img.alt = "";
+    const url = URL.createObjectURL(file);
+    img.src = url;
+    state.activeReceiptUrl = url;
+    els.receiptThumb.appendChild(img);
+  } else {
+    els.receiptThumb.textContent = "PDF";
+    state.activeReceiptUrl = "";
+  }
+}
+
+function handleFile(file) {
+  try {
+    validateFile(file);
+  } catch (error) {
+    alert(error.message);
+    return;
+  }
+
+  showFilePreview(file);
+  setStep(0);
+  setBadge("OCR", "busy");
+
+  window.setTimeout(() => {
+    setStep(1);
+    setBadge("Parsing", "busy");
+  }, 500);
+
+  window.setTimeout(() => {
+    const extracted = simulateExtraction(file);
+    populateForm(extracted);
+    setStep(2);
+    setBadge("Review", "done");
+  }, 1000);
+}
+
+function filteredExpenses() {
+  return state.expenses
+    .filter((expense) => {
+      const afterStart = !els.filterStart.value || expense.date >= els.filterStart.value;
+      const beforeEnd = !els.filterEnd.value || expense.date <= els.filterEnd.value;
+      const categoryMatch = !els.filterCategory.value || expense.category === els.filterCategory.value;
+      return afterStart && beforeEnd && categoryMatch;
+    })
+    .sort((a, b) => b.date.localeCompare(a.date));
+}
+
+function totalsByCategory(expenses) {
+  return expenses.reduce((acc, expense) => {
+    acc[expense.category] = (acc[expense.category] || 0) + Number(expense.amount);
+    return acc;
+  }, {});
+}
+
+function drawChart(expenses) {
+  const ctx = els.categoryChart.getContext("2d");
+  const size = els.categoryChart.width;
+  const center = size / 2;
+  const radius = center - 12;
+  const totals = totalsByCategory(expenses);
+  const entries = Object.entries(totals).filter(([, amount]) => amount > 0);
+  const grandTotal = entries.reduce((sum, [, amount]) => sum + amount, 0);
+
+  ctx.clearRect(0, 0, size, size);
+
+  if (!entries.length) {
+    ctx.beginPath();
+    ctx.arc(center, center, radius, 0, Math.PI * 2);
+    ctx.fillStyle = "#eef1ed";
+    ctx.fill();
+    ctx.fillStyle = "#66717a";
+    ctx.font = "700 16px system-ui";
+    ctx.textAlign = "center";
+    ctx.fillText("No data", center, center + 5);
+    els.chartLegend.innerHTML = '<p class="empty-state">Save expenses to build the chart.</p>';
+    return;
+  }
+
+  let start = -Math.PI / 2;
+  entries.forEach(([category, amount]) => {
+    const angle = (amount / grandTotal) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(center, center);
+    ctx.arc(center, center, radius, start, start + angle);
+    ctx.closePath();
+    ctx.fillStyle = categoryColors[category] || categoryColors.Other;
+    ctx.fill();
+    start += angle;
+  });
+
+  ctx.beginPath();
+  ctx.arc(center, center, radius * 0.58, 0, Math.PI * 2);
+  ctx.fillStyle = "#ffffff";
+  ctx.fill();
+  ctx.fillStyle = "#182027";
+  ctx.font = "800 20px system-ui";
+  ctx.textAlign = "center";
+  ctx.fillText(formatMoney(grandTotal, "EUR"), center, center + 6);
+
+  els.chartLegend.innerHTML = entries
+    .sort((a, b) => b[1] - a[1])
+    .map(([category, amount]) => {
+      const color = categoryColors[category] || categoryColors.Other;
+      return `
+        <div class="legend-row">
+          <span class="legend-dot" style="background:${color}"></span>
+          <span>${category}</span>
+          <strong>${formatMoney(amount, "EUR")}</strong>
+        </div>
+      `;
+    })
+    .join("");
+}
+
+function updateMetrics(expenses) {
+  const now = new Date();
+  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const monthly = state.expenses.filter((expense) => expense.date.startsWith(currentMonth));
+  const monthlyTotal = monthly.reduce((sum, expense) => sum + Number(expense.amount), 0);
+  const allTotal = state.expenses.reduce((sum, expense) => sum + Number(expense.amount), 0);
+  const categoryTotals = totalsByCategory(expenses);
+  const top = Object.entries(categoryTotals).sort((a, b) => b[1] - a[1])[0];
+
+  els.monthlyTotal.textContent = formatMoney(monthlyTotal, "EUR");
+  els.monthlyCount.textContent = `${monthly.length} expense${monthly.length === 1 ? "" : "s"} this month`;
+  els.averageReceipt.textContent = formatMoney(state.expenses.length ? allTotal / state.expenses.length : 0, "EUR");
+  els.topCategory.textContent = top ? top[0] : "None";
+  els.topCategoryAmount.textContent = top ? formatMoney(top[1], "EUR") : "No category data yet";
+}
+
+function renderTransactions(expenses) {
+  els.transactionsBody.innerHTML = expenses
+    .map((expense) => `
+      <tr>
+        <td>${formatDate(expense.date)}</td>
+        <td>${expense.merchant}</td>
+        <td><span class="category-pill">${expense.category}</span></td>
+        <td>${formatMoney(expense.amount, expense.currency)}</td>
+        <td>
+          <button class="secondary-button" type="button" data-edit="${expense.id}">Edit</button>
+          <button class="danger-button" type="button" data-delete="${expense.id}">Delete</button>
+        </td>
+      </tr>
+    `)
+    .join("");
+  els.emptyState.hidden = expenses.length > 0;
+}
+
+function render() {
+  const expenses = filteredExpenses();
+  updateMetrics(expenses);
+  drawChart(expenses);
+  renderTransactions(expenses);
+}
+
+els.dropZone.addEventListener("dragover", (event) => {
+  event.preventDefault();
+  els.dropZone.classList.add("dragging");
+});
+
+els.dropZone.addEventListener("dragleave", () => {
+  els.dropZone.classList.remove("dragging");
+});
+
+els.dropZone.addEventListener("drop", (event) => {
+  event.preventDefault();
+  els.dropZone.classList.remove("dragging");
+  const [file] = event.dataTransfer.files;
+  if (file) handleFile(file);
+});
+
+els.receiptInput.addEventListener("change", (event) => {
+  const [file] = event.target.files;
+  if (file) handleFile(file);
+});
+
+els.expenseForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const formData = new FormData(els.expenseForm);
+  const data = {
+    merchant: formData.get("merchant").trim(),
+    date: formData.get("date"),
+    amount: Number(formData.get("amount")),
+    currency: formData.get("currency"),
+    category: formData.get("category"),
+    rawText: formData.get("rawText"),
+    receiptUrl: state.activeReceiptUrl
+  };
+
+  if (!data.merchant || !data.date || !Number.isFinite(data.amount)) return;
+
+  if (state.editingId) {
+    state.expenses = state.expenses.map((expense) =>
+      expense.id === state.editingId
+        ? { ...expense, ...data, raw_text: data.rawText, receipt_url: data.receiptUrl || expense.receipt_url }
+        : expense
+    );
+  } else {
+    state.expenses.unshift(createExpense(data));
+  }
+
+  saveExpenses();
+  clearForm();
+  setStep(3);
+  render();
+});
+
+els.resetFormButton.addEventListener("click", clearForm);
+
+els.transactionsBody.addEventListener("click", (event) => {
+  const editId = event.target.dataset.edit;
+  const deleteId = event.target.dataset.delete;
+
+  if (editId) {
+    const expense = state.expenses.find((item) => item.id === editId);
+    if (!expense) return;
+    state.editingId = editId;
+    state.activeReceiptUrl = expense.receipt_url;
+    populateForm({
+      ...expense,
+      rawText: expense.raw_text
+    });
+    setBadge("Editing", "busy");
+    setStep(2);
+    document.querySelector("#reviewTitle").scrollIntoView({ behavior: "smooth" });
+  }
+
+  if (deleteId) {
+    state.expenses = state.expenses.filter((item) => item.id !== deleteId);
+    saveExpenses();
+    render();
+  }
+});
+
+[els.filterStart, els.filterEnd, els.filterCategory].forEach((filter) => {
+  filter.addEventListener("input", render);
+});
+
+els.seedButton.addEventListener("click", () => {
+  const existingSample = state.expenses.some((expense) => expense.raw_text.includes("Bon Nr. 4821"));
+  if (!existingSample) {
+    state.expenses = [...sampleReceipts.map(createExpense), ...state.expenses];
+    saveExpenses();
+  }
+  render();
+});
+
+clearForm();
+render();

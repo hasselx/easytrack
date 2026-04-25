@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#182027" />
+    <title>Receipt-Based Expense Tracker</title>
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Primary">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" role="img">
+              <path d="M7 3h10a2 2 0 0 1 2 2v16l-3-2-3 2-3-2-3 2-2-1.3V5a2 2 0 0 1 2-2Z" />
+              <path d="M8.5 8h7M8.5 12h7M8.5 16h4" />
+            </svg>
+          </div>
+          <div>
+            <p>ReceiptFlow</p>
+            <span>MVP v1</span>
+          </div>
+        </div>
+
+        <nav class="nav-list" aria-label="Sections">
+          <a href="#dashboard" class="active">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13h6V4H4v9Zm10 7h6V4h-6v16ZM4 20h6v-5H4v5Z" /></svg>
+            Dashboard
+          </a>
+          <a href="#upload">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0 4.5 4.5M12 4 7.5 8.5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" /></svg>
+            Upload
+          </a>
+          <a href="#transactions">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14M5 12h14M5 19h14" /></svg>
+            Transactions
+          </a>
+        </nav>
+
+        <div class="status-panel">
+          <span class="status-dot"></span>
+          <div>
+            <strong>Local prototype</strong>
+            <p>Data saves in this browser.</p>
+          </div>
+        </div>
+      </aside>
+
+      <main>
+        <header class="topbar">
+          <div>
+            <h1>Receipt-Based Expense Tracker</h1>
+            <p>Upload receipts, review extracted fields, and watch the dashboard update.</p>
+          </div>
+          <button class="icon-button" id="seedButton" type="button" title="Load sample data" aria-label="Load sample data">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M7 4v6M17 4v6M6 14h12M8 18h8" /></svg>
+          </button>
+        </header>
+
+        <section id="dashboard" class="section-grid metrics-grid" aria-label="Dashboard metrics">
+          <article class="metric">
+            <span>Monthly spend</span>
+            <strong id="monthlyTotal">€0.00</strong>
+            <small id="monthlyCount">0 expenses this month</small>
+          </article>
+          <article class="metric">
+            <span>Average receipt</span>
+            <strong id="averageReceipt">€0.00</strong>
+            <small>Based on saved expenses</small>
+          </article>
+          <article class="metric">
+            <span>Top category</span>
+            <strong id="topCategory">None</strong>
+            <small id="topCategoryAmount">No category data yet</small>
+          </article>
+        </section>
+
+        <section class="content-grid">
+          <article class="panel chart-panel" aria-labelledby="categoryChartTitle">
+            <div class="panel-header">
+              <div>
+                <h2 id="categoryChartTitle">Category Breakdown</h2>
+                <p>Saved expenses by category</p>
+              </div>
+            </div>
+            <div class="chart-layout">
+              <canvas id="categoryChart" width="280" height="280" aria-label="Category breakdown chart"></canvas>
+              <div id="chartLegend" class="legend"></div>
+            </div>
+          </article>
+
+          <article class="panel upload-panel" id="upload" aria-labelledby="uploadTitle">
+            <div class="panel-header">
+              <div>
+                <h2 id="uploadTitle">Receipt Upload</h2>
+                <p>JPG, PNG, or PDF up to 10 MB</p>
+              </div>
+              <span id="processingBadge" class="badge">Ready</span>
+            </div>
+
+            <label class="drop-zone" id="dropZone">
+              <input id="receiptInput" type="file" accept="image/png,image/jpeg,application/pdf" />
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3m0 0 4 4m-4-4L8 7M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4" /></svg>
+              <strong>Drop receipt here</strong>
+              <span>or choose a file</span>
+            </label>
+
+            <div class="receipt-preview" id="receiptPreview" hidden>
+              <div class="receipt-thumb" id="receiptThumb"></div>
+              <div>
+                <strong id="fileName"></strong>
+                <p id="fileMeta"></p>
+              </div>
+            </div>
+          </article>
+        </section>
+
+        <section class="content-grid review-grid">
+          <article class="panel" aria-labelledby="reviewTitle">
+            <div class="panel-header">
+              <div>
+                <h2 id="reviewTitle">Review Extracted Data</h2>
+                <p>Correct fields before saving</p>
+              </div>
+            </div>
+
+            <form id="expenseForm" class="expense-form">
+              <label>
+                Merchant
+                <input id="merchant" name="merchant" type="text" placeholder="Merchant name" required />
+              </label>
+              <label>
+                Date
+                <input id="date" name="date" type="date" required />
+              </label>
+              <label>
+                Amount
+                <input id="amount" name="amount" type="number" min="0" step="0.01" placeholder="0.00" required />
+              </label>
+              <label>
+                Currency
+                <select id="currency" name="currency">
+                  <option>EUR</option>
+                  <option>USD</option>
+                  <option>GBP</option>
+                  <option>CHF</option>
+                </select>
+              </label>
+              <label>
+                Category
+                <select id="category" name="category">
+                  <option>Food</option>
+                  <option>Travel</option>
+                  <option>Shopping</option>
+                  <option>Health</option>
+                  <option>Housing</option>
+                  <option>Utilities</option>
+                  <option>Other</option>
+                </select>
+              </label>
+              <label class="full-span">
+                Raw OCR text
+                <textarea id="rawText" name="rawText" rows="7" placeholder="OCR output appears here"></textarea>
+              </label>
+              <div class="form-actions full-span">
+                <button class="secondary-button" id="resetFormButton" type="button">Clear</button>
+                <button class="primary-button" type="submit">Save Expense</button>
+              </div>
+            </form>
+          </article>
+
+          <article class="panel insights-panel" aria-labelledby="workflowTitle">
+            <div class="panel-header">
+              <div>
+                <h2 id="workflowTitle">Processing Flow</h2>
+                <p>Current receipt status</p>
+              </div>
+            </div>
+            <ol class="steps" id="steps">
+              <li class="done">Upload receipt</li>
+              <li>Extract OCR text</li>
+              <li>Parse fields</li>
+              <li>Review and save</li>
+            </ol>
+            <div class="trust-note">
+              <strong>Manual review is required.</strong>
+              <p>Saved expenses only update the dashboard after you confirm the extracted data.</p>
+            </div>
+          </article>
+        </section>
+
+        <section class="panel transactions-panel" id="transactions" aria-labelledby="transactionsTitle">
+          <div class="panel-header transaction-header">
+            <div>
+              <h2 id="transactionsTitle">Recent Transactions</h2>
+              <p>Filter and edit saved expenses</p>
+            </div>
+            <div class="filters" aria-label="Transaction filters">
+              <input id="filterStart" type="date" aria-label="Start date" />
+              <input id="filterEnd" type="date" aria-label="End date" />
+              <select id="filterCategory" aria-label="Category filter">
+                <option value="">All categories</option>
+                <option>Food</option>
+                <option>Travel</option>
+                <option>Shopping</option>
+                <option>Health</option>
+                <option>Housing</option>
+                <option>Utilities</option>
+                <option>Other</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Merchant</th>
+                  <th>Category</th>
+                  <th>Amount</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="transactionsBody"></tbody>
+            </table>
+          </div>
+          <p id="emptyState" class="empty-state">No expenses yet. Upload a receipt or load sample data.</p>
+        </section>
+      </main>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
