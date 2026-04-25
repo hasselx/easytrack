@@ -9,7 +9,9 @@ A static MVP prototype for uploading receipts, reviewing extracted expense data,
 - Server-side Google Cloud Vision OCR through `/api/vision-ocr`.
 - Server-side AI receipt understanding through `/api/parse-receipt` using Hugging Face, with optional OpenAI fallback.
 - Browser-side OCR fallback for JPG/PNG receipts using Tesseract.js.
-- Automatic parsing for merchant, date, amount, currency, category, tax, phone, address, payment method, cash paid, and change.
+- Automatic parsing for merchant, branch address, phone, date, time, amount, currency, category, tax, payment method, cash paid, and change.
+- German retail receipt topology prompt for Aldi, Kaufland, Woolworth-style receipts.
+- Itemized list extraction with translated item names, quantity, and final line total.
 - Manual correction before saving.
 - Local dashboard and transaction history.
 

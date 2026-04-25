@@ -4,6 +4,7 @@ const receiptSchema = {
   required: [
     "merchant",
     "date",
+    "time",
     "amount",
     "currency",
     "category",
@@ -13,11 +14,13 @@ const receiptSchema = {
     "change_amount",
     "telephone",
     "address",
+    "line_items",
     "notes"
   ],
   properties: {
     merchant: { type: "string" },
     date: { type: "string", description: "ISO date YYYY-MM-DD, or empty string if unknown." },
+    time: { type: "string", description: "Receipt time in HH:MM, or empty string if unknown." },
     amount: { type: "number", description: "Final receipt total. Use -1 if unknown." },
     currency: { type: "string", description: "ISO currency code, for example EUR." },
     category: {
@@ -30,6 +33,22 @@ const receiptSchema = {
     change_amount: { type: "number", description: "Returned balance/change. Use -1 if unknown." },
     telephone: { type: "string" },
     address: { type: "string" },
+    line_items: {
+      type: "array",
+      description: "Main purchased items only. Exclude subtotals, tax/VAT lines, VAT IDs, payment lines, phone numbers, address lines, and receipt metadata.",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["item_name", "item_name_en", "quantity", "total_price", "unclear"],
+        properties: {
+          item_name: { type: "string", description: "Original item name from receipt, or [Unclear]." },
+          item_name_en: { type: "string", description: "English item name if useful, or [Unclear]." },
+          quantity: { type: "number", description: "Multiplier quantity when shown, otherwise 1." },
+          total_price: { type: "number", description: "Final calculated price paid for this line item. Use -1 if unclear." },
+          unclear: { type: "boolean" }
+        }
+      }
+    },
     notes: { type: "string", description: "Short note about ambiguous or missing fields." }
   }
 };
@@ -44,6 +63,7 @@ function normalizeParsedReceipt(receipt) {
   return {
     merchant: receipt.merchant || "",
     date: receipt.date || "",
+    time: receipt.time || "",
     amount: cleanNumber(receipt.amount),
     currency: receipt.currency || "EUR",
     category: categories.includes(receipt.category) ? receipt.category : "Other",
@@ -53,6 +73,15 @@ function normalizeParsedReceipt(receipt) {
     change_amount: cleanNumber(receipt.change_amount),
     telephone: receipt.telephone || "",
     address: receipt.address || "",
+    line_items: Array.isArray(receipt.line_items)
+      ? receipt.line_items.map((item) => ({
+          item_name: item.item_name || "[Unclear]",
+          item_name_en: item.item_name_en || item.item_name || "[Unclear]",
+          quantity: cleanNumber(item.quantity) || 1,
+          total_price: cleanNumber(item.total_price),
+          unclear: Boolean(item.unclear)
+        }))
+      : [],
     notes: receipt.notes || ""
   };
 }
@@ -61,15 +90,26 @@ function receiptPrompt(text, fileName) {
   return `Extract structured receipt expense data as valid JSON only.
 
 Return exactly these keys:
-merchant, date, amount, currency, category, tax, payment_method, cash_paid, change_amount, telephone, address, notes.
+merchant, date, time, amount, currency, category, tax, payment_method, cash_paid, change_amount, telephone, address, line_items, notes.
+
+Receipt topology:
+- Header: store name, branch address, phone or website.
+- Body: purchased item lines. A line can contain an item ID, item name, and price.
+- Quantifiers: lines may show multipliers such as "3 * 0,99"; use quantity 3 and the final calculated line total.
+- Footer: Summe/Total, payment method such as Visa Debit or Visa Prepaid, date, and time.
 
 Rules:
 - date must be YYYY-MM-DD or empty string
+- time must be HH:MM or empty string
 - amount is the final receipt total, not phone number, address, tax id, cash paid, or change
 - category must be one of Food, Travel, Shopping, Health, Housing, Utilities, Other
 - unknown numeric values must be -1
 - unknown text values must be empty strings
 - currency should be EUR unless another currency is clearly present
+- line_items must include only purchased items, not subtotal, tax, VAT ID, payment, phone, address, or receipt metadata rows
+- if a line item has a calculation such as "2 * 2,49", quantity is 2 and total_price is the final calculated price paid for that item
+- translate German item names to English in item_name_en when helpful
+- if text is cropped or obscured, use "[Unclear]" for that item field and set unclear true
 
 File name: ${fileName || "receipt"}
 
@@ -148,7 +188,7 @@ async function parseWithOpenAI(text, fileName) {
         {
           role: "system",
           content:
-            "You extract structured expense data from noisy OCR receipt text. Return only fields supported by the schema. Distinguish the final total from phone numbers, addresses, tax IDs, cash tendered, and returned change. Use -1 for unknown numeric values and empty strings for unknown text values."
+            "You extract structured expense data from noisy OCR German retail receipt text. Use receipt topology: header has store, address, phone; body has purchased items; footer has Summe/total, payment, date, and time. Distinguish final total from item prices, phone numbers, addresses, tax IDs, cash tendered, and returned change. For line items, capture quantity from multipliers like '2 * 2,49' and total_price as the final calculated line price. Exclude subtotals, tax breakdowns, VAT IDs, payment lines, phone, address, and receipt metadata from line_items. Use -1 for unknown numeric values, empty strings for unknown text values, and '[Unclear]' for obscured item fields."
         },
         {
           role: "user",

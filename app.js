@@ -94,6 +94,7 @@ const els = {
   expenseForm: document.querySelector("#expenseForm"),
   merchant: document.querySelector("#merchant"),
   date: document.querySelector("#date"),
+  time: document.querySelector("#time"),
   amount: document.querySelector("#amount"),
   currency: document.querySelector("#currency"),
   category: document.querySelector("#category"),
@@ -103,6 +104,8 @@ const els = {
   changeAmount: document.querySelector("#changeAmount"),
   telephone: document.querySelector("#telephone"),
   address: document.querySelector("#address"),
+  lineItemsBody: document.querySelector("#lineItemsBody"),
+  lineItemsJson: document.querySelector("#lineItemsJson"),
   rawText: document.querySelector("#rawText"),
   resetFormButton: document.querySelector("#resetFormButton"),
   visionStatus: document.querySelector("#visionStatus"),
@@ -247,6 +250,7 @@ function createExpense(data) {
     user_id: "local-user",
     merchant: data.merchant,
     date: data.date,
+    time: data.time || "",
     amount: Number(data.amount),
     currency: data.currency,
     category: data.category,
@@ -257,6 +261,7 @@ function createExpense(data) {
     change_amount: data.changeAmount || null,
     telephone: data.telephone || "",
     address: data.address || "",
+    line_items: Array.isArray(data.lineItems) ? data.lineItems : [],
     receipt_url: data.receiptUrl || "",
     created_at: new Date().toISOString()
   };
@@ -345,6 +350,7 @@ function parseReceiptText(text, fileName = "") {
   return {
     merchant,
     date: normalizeDate(dateMatch?.[0]) || todayISO(),
+    time: joined.match(/\b([01]?\d|2[0-3]):[0-5]\d\b/)?.[0] || "",
     amount: amount || "",
     currency,
     category: categorize(merchant),
@@ -354,6 +360,7 @@ function parseReceiptText(text, fileName = "") {
     changeAmount: normalizeAmount(changeMatch?.[0]) || "",
     telephone: telephoneMatch?.[1]?.trim() || "",
     address: addressLine || "",
+    lineItems: [],
     rawText: text
   };
 }
@@ -377,6 +384,7 @@ async function parseReceiptWithAi(text, fileName = "") {
   return {
     merchant: payload.merchant || "",
     date: payload.date || todayISO(),
+    time: payload.time || "",
     amount: payload.amount ?? "",
     currency: payload.currency || "EUR",
     category: payload.category || categorize(payload.merchant || ""),
@@ -386,6 +394,7 @@ async function parseReceiptWithAi(text, fileName = "") {
     changeAmount: payload.change_amount ?? "",
     telephone: payload.telephone || "",
     address: payload.address || "",
+    lineItems: Array.isArray(payload.line_items) ? payload.line_items : [],
     rawText: text
   };
 }
@@ -519,6 +528,7 @@ async function captureCameraPhoto() {
 function populateForm(expense) {
   els.merchant.value = expense.merchant || "";
   els.date.value = expense.date || todayISO();
+  els.time.value = expense.time || "";
   els.amount.value = expense.amount || "";
   els.currency.value = expense.currency || "EUR";
   els.category.value = expense.category || "Other";
@@ -528,7 +538,25 @@ function populateForm(expense) {
   els.changeAmount.value = expense.changeAmount || expense.change_amount || "";
   els.telephone.value = expense.telephone || "";
   els.address.value = expense.address || "";
+  const lineItems = expense.lineItems || expense.line_items || [];
+  els.lineItemsJson.value = JSON.stringify(lineItems, null, 2);
+  renderLineItems(lineItems);
   els.rawText.value = expense.rawText || expense.raw_text || "";
+}
+
+function renderLineItems(lineItems) {
+  const items = Array.isArray(lineItems) ? lineItems : [];
+  els.lineItemsBody.innerHTML = items.length
+    ? items
+        .map((item) => `
+          <tr>
+            <td>${item.item_name_en || item.item_name || "[Unclear]"}</td>
+            <td>${item.quantity || 1}</td>
+            <td>${item.total_price === "" || item.total_price == null ? "[Unclear]" : formatMoney(item.total_price, "EUR")}</td>
+          </tr>
+        `)
+        .join("")
+    : '<tr><td colspan="3">No line items extracted.</td></tr>';
 }
 
 function clearForm() {
@@ -537,6 +565,8 @@ function clearForm() {
   els.expenseForm.reset();
   els.currency.value = "EUR";
   els.category.value = "Food";
+  els.lineItemsJson.value = "[]";
+  renderLineItems([]);
   els.rawText.value = "";
   els.receiptPreview.hidden = true;
   els.receiptThumb.innerHTML = "";
@@ -788,6 +818,7 @@ els.expenseForm.addEventListener("submit", (event) => {
   const data = {
     merchant: formData.get("merchant").trim(),
     date: formData.get("date"),
+    time: formData.get("time"),
     amount: Number(formData.get("amount")),
     currency: formData.get("currency"),
     category: formData.get("category"),
@@ -797,6 +828,7 @@ els.expenseForm.addEventListener("submit", (event) => {
     changeAmount: formData.get("changeAmount") ? Number(formData.get("changeAmount")) : null,
     telephone: formData.get("telephone").trim(),
     address: formData.get("address").trim(),
+    lineItems: parseLineItemsJson(formData.get("lineItemsJson")),
     rawText: formData.get("rawText"),
     receiptUrl: state.activeReceiptUrl
   };
@@ -813,6 +845,7 @@ els.expenseForm.addEventListener("submit", (event) => {
             payment_method: data.paymentMethod,
             cash_paid: data.cashPaid,
             change_amount: data.changeAmount,
+            line_items: data.lineItems,
             receipt_url: data.receiptUrl || expense.receipt_url
           }
         : expense
@@ -826,6 +859,19 @@ els.expenseForm.addEventListener("submit", (event) => {
   setStep(3);
   render();
 });
+
+els.lineItemsJson.addEventListener("input", () => {
+  renderLineItems(parseLineItemsJson(els.lineItemsJson.value));
+});
+
+function parseLineItemsJson(value) {
+  try {
+    const parsed = JSON.parse(value || "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
 
 els.resetFormButton.addEventListener("click", clearForm);
 

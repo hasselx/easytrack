@@ -600,6 +600,22 @@ textarea:focus {
   overflow-x: auto;
 }
 
+.line-items-table {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.line-items-table table {
+  min-width: 420px;
+}
+
+.line-items-table th,
+.line-items-table td {
+  padding: 10px;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
