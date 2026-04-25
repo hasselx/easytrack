@@ -131,9 +131,29 @@ function saveExpenses() {
 }
 
 function updateVisionSettings() {
-  els.visionStatus.textContent = location.protocol === "file:" ? "Needs deployed server" : "Server endpoint";
-  els.visionStatus.style.background = location.protocol === "file:" ? "#fff7e6" : "#e8f4ed";
-  els.visionStatus.style.color = location.protocol === "file:" ? "#8a5d08" : "#2f8f68";
+  if (location.protocol === "file:") {
+    els.visionStatus.textContent = "Needs deployed server";
+    els.visionStatus.style.background = "#fff7e6";
+    els.visionStatus.style.color = "#8a5d08";
+    return;
+  }
+
+  els.visionStatus.textContent = "Checking";
+  els.visionStatus.style.background = "#eef1ed";
+  els.visionStatus.style.color = "#66717a";
+
+  fetch("/api/vision-ocr")
+    .then((response) => response.json())
+    .then((payload) => {
+      els.visionStatus.textContent = payload.configured ? "Connected" : "Missing key";
+      els.visionStatus.style.background = payload.configured ? "#e8f4ed" : "#fff7e6";
+      els.visionStatus.style.color = payload.configured ? "#2f8f68" : "#8a5d08";
+    })
+    .catch(() => {
+      els.visionStatus.textContent = "Server unavailable";
+      els.visionStatus.style.background = "#fbebea";
+      els.visionStatus.style.color = "#c0564a";
+    });
 }
 
 function formatMoney(amount, currency = "EUR") {
