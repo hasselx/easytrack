@@ -198,6 +198,30 @@
                   <option>Other</option>
                 </select>
               </label>
+              <label>
+                Tax
+                <input id="tax" name="tax" type="number" min="0" step="0.01" placeholder="0.00" />
+              </label>
+              <label>
+                Payment method
+                <input id="paymentMethod" name="paymentMethod" type="text" placeholder="Card, cash, etc." />
+              </label>
+              <label>
+                Cash paid
+                <input id="cashPaid" name="cashPaid" type="number" min="0" step="0.01" placeholder="0.00" />
+              </label>
+              <label>
+                Change
+                <input id="changeAmount" name="changeAmount" type="number" min="0" step="0.01" placeholder="0.00" />
+              </label>
+              <label>
+                Telephone
+                <input id="telephone" name="telephone" type="tel" placeholder="+49..." />
+              </label>
+              <label>
+                Address
+                <input id="address" name="address" type="text" placeholder="Receipt address" />
+              </label>
               <label class="full-span">
                 Raw OCR text
                 <textarea id="rawText" name="rawText" rows="7" placeholder="OCR output appears here"></textarea>
@@ -305,6 +329,28 @@
             <div class="trust-note">
               <strong>The browser never sees the Google API key.</strong>
               <p>Deploy with a serverless host such as Vercel and add GOOGLE_VISION_API_KEY in the project environment variables.</p>
+            </div>
+          </article>
+
+          <article class="panel settings-panel" aria-labelledby="parserTitle">
+            <div class="panel-header">
+              <div>
+                <h2 id="parserTitle">AI Receipt Parser</h2>
+                <p>Understands OCR text and separates totals, tax, cash, change, address, telephone, and payment method.</p>
+              </div>
+              <span id="parserStatus" class="badge">Server endpoint</span>
+            </div>
+
+            <div class="settings-form">
+              <label>
+                Parser endpoint
+                <input value="/api/parse-receipt" readonly />
+              </label>
+            </div>
+
+            <div class="trust-note">
+              <strong>The OpenAI key belongs on the server.</strong>
+              <p>Add OPENAI_API_KEY in Vercel. The browser sends only OCR text to your server endpoint.</p>
             </div>
           </article>
         </section>

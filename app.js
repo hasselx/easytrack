@@ -97,9 +97,16 @@ const els = {
   amount: document.querySelector("#amount"),
   currency: document.querySelector("#currency"),
   category: document.querySelector("#category"),
+  tax: document.querySelector("#tax"),
+  paymentMethod: document.querySelector("#paymentMethod"),
+  cashPaid: document.querySelector("#cashPaid"),
+  changeAmount: document.querySelector("#changeAmount"),
+  telephone: document.querySelector("#telephone"),
+  address: document.querySelector("#address"),
   rawText: document.querySelector("#rawText"),
   resetFormButton: document.querySelector("#resetFormButton"),
   visionStatus: document.querySelector("#visionStatus"),
+  parserStatus: document.querySelector("#parserStatus"),
   monthlyTotal: document.querySelector("#monthlyTotal"),
   monthlyCount: document.querySelector("#monthlyCount"),
   averageReceipt: document.querySelector("#averageReceipt"),
@@ -153,6 +160,29 @@ function updateVisionSettings() {
       els.visionStatus.textContent = "Server unavailable";
       els.visionStatus.style.background = "#fbebea";
       els.visionStatus.style.color = "#c0564a";
+    });
+}
+
+function setStatusBadge(element, text, mode) {
+  element.textContent = text;
+  element.style.background = mode === "ok" ? "#e8f4ed" : mode === "warn" ? "#fff7e6" : mode === "bad" ? "#fbebea" : "#eef1ed";
+  element.style.color = mode === "ok" ? "#2f8f68" : mode === "warn" ? "#8a5d08" : mode === "bad" ? "#c0564a" : "#66717a";
+}
+
+function updateParserSettings() {
+  if (location.protocol === "file:") {
+    setStatusBadge(els.parserStatus, "Needs deployed server", "warn");
+    return;
+  }
+
+  setStatusBadge(els.parserStatus, "Checking", "neutral");
+  fetch("/api/parse-receipt")
+    .then((response) => response.json())
+    .then((payload) => {
+      setStatusBadge(els.parserStatus, payload.configured ? "Connected" : "Missing key", payload.configured ? "ok" : "warn");
+    })
+    .catch(() => {
+      setStatusBadge(els.parserStatus, "Server unavailable", "bad");
     });
 }
 
@@ -220,6 +250,12 @@ function createExpense(data) {
     currency: data.currency,
     category: data.category,
     raw_text: data.rawText,
+    tax: data.tax || null,
+    payment_method: data.paymentMethod || "",
+    cash_paid: data.cashPaid || null,
+    change_amount: data.changeAmount || null,
+    telephone: data.telephone || "",
+    address: data.address || "",
     receipt_url: data.receiptUrl || "",
     created_at: new Date().toISOString()
   };
@@ -291,6 +327,15 @@ function parseReceiptText(text, fileName = "") {
   const keywordAmounts = keywordLines.flatMap((line) => Array.from(line.matchAll(amountPattern)).map((match) => normalizeAmount(match[1])));
   const allAmounts = Array.from(joined.matchAll(amountPattern)).map((match) => normalizeAmount(match[1])).filter(Boolean);
   const amount = keywordAmounts.filter(Boolean).at(-1) || Math.max(0, ...allAmounts);
+  const taxLine = lines.find((line) => /(tax|mwst|ust|vat)/i.test(line) && /[\d][\d\s.,]*\d/.test(line));
+  const taxMatch = taxLine?.match(amountPattern);
+  const cashLine = lines.find((line) => /(cash|bar|gegeben|received|tendered)/i.test(line) && /[\d][\d\s.,]*\d/.test(line));
+  const cashMatch = cashLine?.match(amountPattern);
+  const changeLine = lines.find((line) => /(change|rueckgeld|rückgeld|balance|zurueck|zurück)/i.test(line) && /[\d][\d\s.,]*\d/.test(line));
+  const changeMatch = changeLine?.match(amountPattern);
+  const telephoneMatch = joined.match(/(?:tel\.?|telefon|phone)[:\s]*([+()0-9][+()0-9\s/-]{5,})/i) || joined.match(/(\+?\d[\d\s()/.-]{7,}\d)/);
+  const paymentLine = lines.find((line) => /(visa|mastercard|maestro|amex|card|karte|ec|cash|bar|paypal|apple pay|google pay)/i.test(line));
+  const addressLine = lines.find((line) => /\b\d{5}\b/.test(line) || /\b(strasse|straße|str\.|platz|allee|road|street|st\.)\b/i.test(line));
   const merchant = lines.find((line) => {
     const lower = line.toLowerCase();
     return !/(receipt|beleg|bon|rechnung|tax|mwst|datum|date|total|summe|gesamt|eur|usd|gbp|chf|tel|ust|vat|iban|karte|visa|mastercard)/i.test(lower) && /[a-zA-Z]{2,}/.test(line);
@@ -302,6 +347,44 @@ function parseReceiptText(text, fileName = "") {
     amount: amount || "",
     currency,
     category: categorize(merchant),
+    tax: normalizeAmount(taxMatch?.[0]) || "",
+    paymentMethod: paymentLine || "",
+    cashPaid: normalizeAmount(cashMatch?.[0]) || "",
+    changeAmount: normalizeAmount(changeMatch?.[0]) || "",
+    telephone: telephoneMatch?.[1]?.trim() || "",
+    address: addressLine || "",
+    rawText: text
+  };
+}
+
+async function parseReceiptWithAi(text, fileName = "") {
+  if (location.protocol === "file:") {
+    throw new Error("AI parser requires the deployed server.");
+  }
+
+  const response = await fetch("/api/parse-receipt", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ text, fileName })
+  });
+  const payload = await response.json();
+  if (!response.ok || payload.error) {
+    throw new Error(payload.error || "AI receipt parser failed.");
+  }
+  return {
+    merchant: payload.merchant || "",
+    date: payload.date || todayISO(),
+    amount: payload.amount ?? "",
+    currency: payload.currency || "EUR",
+    category: payload.category || categorize(payload.merchant || ""),
+    tax: payload.tax ?? "",
+    paymentMethod: payload.payment_method || "",
+    cashPaid: payload.cash_paid ?? "",
+    changeAmount: payload.change_amount ?? "",
+    telephone: payload.telephone || "",
+    address: payload.address || "",
     rawText: text
   };
 }
@@ -438,6 +521,12 @@ function populateForm(expense) {
   els.amount.value = expense.amount || "";
   els.currency.value = expense.currency || "EUR";
   els.category.value = expense.category || "Other";
+  els.tax.value = expense.tax || "";
+  els.paymentMethod.value = expense.paymentMethod || expense.payment_method || "";
+  els.cashPaid.value = expense.cashPaid || expense.cash_paid || "";
+  els.changeAmount.value = expense.changeAmount || expense.change_amount || "";
+  els.telephone.value = expense.telephone || "";
+  els.address.value = expense.address || "";
   els.rawText.value = expense.rawText || expense.raw_text || "";
 }
 
@@ -500,8 +589,13 @@ async function handleFile(file) {
     if (file.type.startsWith("image/")) {
       const text = await runImageOcr(file);
       setStep(1);
-      setBadge("Parsing", "busy");
-      extracted = parseReceiptText(text, file.name);
+      setBadge("AI parsing", "busy");
+      try {
+        extracted = await parseReceiptWithAi(text, file.name);
+      } catch (error) {
+        console.info("AI parser unavailable, using local parser.", error);
+        extracted = parseReceiptText(text, file.name);
+      }
     } else {
       extracted = fallbackExtraction(file);
       extracted.rawText = `${extracted.rawText}\n\nPDF OCR is not enabled in this static MVP. Enter the values manually before saving.`;
@@ -696,6 +790,12 @@ els.expenseForm.addEventListener("submit", (event) => {
     amount: Number(formData.get("amount")),
     currency: formData.get("currency"),
     category: formData.get("category"),
+    tax: formData.get("tax") ? Number(formData.get("tax")) : null,
+    paymentMethod: formData.get("paymentMethod").trim(),
+    cashPaid: formData.get("cashPaid") ? Number(formData.get("cashPaid")) : null,
+    changeAmount: formData.get("changeAmount") ? Number(formData.get("changeAmount")) : null,
+    telephone: formData.get("telephone").trim(),
+    address: formData.get("address").trim(),
     rawText: formData.get("rawText"),
     receiptUrl: state.activeReceiptUrl
   };
@@ -705,7 +805,15 @@ els.expenseForm.addEventListener("submit", (event) => {
   if (state.editingId) {
     state.expenses = state.expenses.map((expense) =>
       expense.id === state.editingId
-        ? { ...expense, ...data, raw_text: data.rawText, receipt_url: data.receiptUrl || expense.receipt_url }
+        ? {
+            ...expense,
+            ...data,
+            raw_text: data.rawText,
+            payment_method: data.paymentMethod,
+            cash_paid: data.cashPaid,
+            change_amount: data.changeAmount,
+            receipt_url: data.receiptUrl || expense.receipt_url
+          }
         : expense
     );
   } else {
@@ -777,5 +885,6 @@ els.seedButton.addEventListener("click", () => {
 
 clearForm();
 updateVisionSettings();
+updateParserSettings();
 setPage(location.hash.replace("#", "") || "dashboard");
 render();

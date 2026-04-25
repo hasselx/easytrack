@@ -7,8 +7,9 @@ A static MVP prototype for uploading receipts, reviewing extracted expense data,
 - Mobile-style app navigation with a hamburger menu.
 - Upload a receipt image, choose a file, or take a photo on mobile.
 - Server-side Google Cloud Vision OCR through `/api/vision-ocr`.
+- Server-side AI receipt understanding through `/api/parse-receipt`.
 - Browser-side OCR fallback for JPG/PNG receipts using Tesseract.js.
-- Automatic parsing for merchant, date, amount, currency, and category.
+- Automatic parsing for merchant, date, amount, currency, category, tax, phone, address, payment method, cash paid, and change.
 - Manual correction before saving.
 - Local dashboard and transaction history.
 
@@ -17,7 +18,7 @@ A static MVP prototype for uploading receipts, reviewing extracted expense data,
 - The camera works best on a live HTTPS deployment.
 - Gallery uploads are downscaled before OCR to reduce browser memory use.
 - If OCR cannot read a receipt clearly, the app leaves fields editable instead of inserting fake values.
-- Do not hardcode API keys into this repo. Add `GOOGLE_VISION_API_KEY` as a server environment variable.
+- Do not hardcode API keys into this repo. Add `GOOGLE_VISION_API_KEY` and `OPENAI_API_KEY` as server environment variables.
 
 ## Run locally as static UI
 
@@ -35,7 +36,19 @@ Use a serverless host such as Vercel.
 npm install -g vercel
 ```
 
-2. Add an environment variable named `GOOGLE_VISION_API_KEY` in Vercel.
+2. Add these environment variables in Vercel:
+
+```text
+GOOGLE_VISION_API_KEY=your_google_cloud_vision_key
+OPENAI_API_KEY=your_openai_api_key
+```
+
+Optional:
+
+```text
+OPENAI_MODEL=gpt-4o-mini
+```
+
 3. Run locally through Vercel:
 
 ```powershell
