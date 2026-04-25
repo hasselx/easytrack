@@ -7,6 +7,7 @@ A static MVP prototype for uploading receipts, reviewing extracted expense data,
 - Mobile-style app navigation with a hamburger menu.
 - Upload a receipt image, choose a file, or take a photo on mobile.
 - Browser-side OCR for JPG/PNG receipts using Tesseract.js.
+- Optional Google Cloud Vision OCR through a locally saved API key.
 - Automatic parsing for merchant, date, amount, currency, and category.
 - Manual correction before saving.
 - Local dashboard and transaction history.
@@ -16,6 +17,7 @@ A static MVP prototype for uploading receipts, reviewing extracted expense data,
 - The camera works best on the live HTTPS GitHub Pages URL.
 - Gallery uploads are downscaled before OCR to reduce browser memory use.
 - If OCR cannot read a receipt clearly, the app leaves fields editable instead of inserting fake values.
+- Do not hardcode API keys into this repo. Add the Google Cloud Vision key in the app's Settings page.
 
 ## Run locally
 

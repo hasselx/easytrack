@@ -39,6 +39,10 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14M5 12h14M5 19h14" /></svg>
             Transactions
           </a>
+          <a href="#settings" data-page-link="settings">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1A2 2 0 1 1 4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1A2 2 0 1 1 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.6V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1A2 2 0 1 1 19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.1a2 2 0 1 1 0 4H21a1.7 1.7 0 0 0-1.6 1Z" /></svg>
+            Settings
+          </a>
         </nav>
 
         <div class="status-panel">
@@ -271,6 +275,41 @@
             </table>
           </div>
           <p id="emptyState" class="empty-state">No expenses yet. Upload a receipt or load sample data.</p>
+          </article>
+        </section>
+
+        <section class="app-page" id="settings" data-page="settings">
+          <header class="topbar">
+            <div>
+              <h1>Settings</h1>
+              <p>Connect OCR services for better receipt extraction.</p>
+            </div>
+          </header>
+
+          <article class="panel settings-panel" aria-labelledby="visionTitle">
+            <div class="panel-header">
+              <div>
+                <h2 id="visionTitle">Google Cloud Vision OCR</h2>
+                <p>Your API key is stored only in this browser and is not committed to GitHub.</p>
+              </div>
+              <span id="visionStatus" class="badge">Not connected</span>
+            </div>
+
+            <form id="visionForm" class="settings-form">
+              <label>
+                API key
+                <input id="visionApiKey" name="visionApiKey" type="password" autocomplete="off" placeholder="Paste Google Cloud Vision API key" />
+              </label>
+              <div class="form-actions">
+                <button class="secondary-button" id="clearVisionKeyButton" type="button">Clear key</button>
+                <button class="primary-button" type="submit">Save key</button>
+              </div>
+            </form>
+
+            <div class="trust-note">
+              <strong>Receipt images are sent to Google only when this key is saved.</strong>
+              <p>For a public production app, use a backend proxy instead of exposing an API key in browser code.</p>
+            </div>
           </article>
         </section>
       </main>

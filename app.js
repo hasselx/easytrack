@@ -1,4 +1,5 @@
 const STORAGE_KEY = "receiptflow.expenses.v1";
+const VISION_KEY_STORAGE = "receiptflow.googleVisionApiKey.v1";
 
 const categoryColors = {
   Food: "#2f8f68",
@@ -100,6 +101,10 @@ const els = {
   category: document.querySelector("#category"),
   rawText: document.querySelector("#rawText"),
   resetFormButton: document.querySelector("#resetFormButton"),
+  visionForm: document.querySelector("#visionForm"),
+  visionApiKey: document.querySelector("#visionApiKey"),
+  visionStatus: document.querySelector("#visionStatus"),
+  clearVisionKeyButton: document.querySelector("#clearVisionKeyButton"),
   monthlyTotal: document.querySelector("#monthlyTotal"),
   monthlyCount: document.querySelector("#monthlyCount"),
   averageReceipt: document.querySelector("#averageReceipt"),
@@ -128,6 +133,18 @@ function loadExpenses() {
 
 function saveExpenses() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state.expenses));
+}
+
+function getVisionApiKey() {
+  return localStorage.getItem(VISION_KEY_STORAGE) || "";
+}
+
+function updateVisionSettings() {
+  const hasKey = Boolean(getVisionApiKey());
+  els.visionStatus.textContent = hasKey ? "Connected" : "Not connected";
+  els.visionStatus.style.background = hasKey ? "#e8f4ed" : "#eef1ed";
+  els.visionStatus.style.color = hasKey ? "#2f8f68" : "#66717a";
+  els.visionApiKey.placeholder = hasKey ? "Saved locally. Paste a new key to replace it." : "Paste Google Cloud Vision API key";
 }
 
 function formatMoney(amount, currency = "EUR") {
@@ -281,11 +298,16 @@ function parseReceiptText(text, fileName = "") {
 }
 
 async function runImageOcr(file) {
+  const ocrImage = await prepareImageForOcr(file);
+  const visionApiKey = getVisionApiKey();
+  if (visionApiKey) {
+    return runGoogleVisionOcr(ocrImage, visionApiKey);
+  }
+
   if (!window.Tesseract) {
     throw new Error("OCR engine is still loading. Try again in a moment.");
   }
 
-  const ocrImage = await prepareImageForOcr(file);
   const result = await window.Tesseract.recognize(ocrImage, "eng", {
     logger(progress) {
       if (progress.status === "recognizing text") {
@@ -295,6 +317,46 @@ async function runImageOcr(file) {
   });
 
   return result.data.text;
+}
+
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(",")[1] || "");
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function runGoogleVisionOcr(imageBlob, apiKey) {
+  setBadge("Google OCR", "busy");
+  const content = await blobToBase64(imageBlob);
+  const response = await fetch(`https://vision.googleapis.com/v1/images:annotate?key=${encodeURIComponent(apiKey)}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      requests: [
+        {
+          image: { content },
+          features: [{ type: "TEXT_DETECTION" }]
+        }
+      ]
+    })
+  });
+  const payload = await response.json();
+
+  if (!response.ok || payload.error) {
+    throw new Error(payload.error?.message || "Google Vision OCR failed.");
+  }
+
+  const result = payload.responses?.[0];
+  if (result?.error) {
+    throw new Error(result.error.message || "Google Vision could not read this image.");
+  }
+
+  return result?.textAnnotations?.[0]?.description || "";
 }
 
 async function prepareImageForOcr(file) {
@@ -660,6 +722,21 @@ els.expenseForm.addEventListener("submit", (event) => {
 
 els.resetFormButton.addEventListener("click", clearForm);
 
+els.visionForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const key = els.visionApiKey.value.trim();
+  if (!key) return;
+  localStorage.setItem(VISION_KEY_STORAGE, key);
+  els.visionApiKey.value = "";
+  updateVisionSettings();
+});
+
+els.clearVisionKeyButton.addEventListener("click", () => {
+  localStorage.removeItem(VISION_KEY_STORAGE);
+  els.visionApiKey.value = "";
+  updateVisionSettings();
+});
+
 els.transactionsBody.addEventListener("click", (event) => {
   const editId = event.target.dataset.edit;
   const deleteId = event.target.dataset.delete;
@@ -701,5 +778,6 @@ els.seedButton.addEventListener("click", () => {
 });
 
 clearForm();
+updateVisionSettings();
 setPage(location.hash.replace("#", "") || "dashboard");
 render();
