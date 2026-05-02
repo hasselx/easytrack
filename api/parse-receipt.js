@@ -113,12 +113,17 @@ function normalizeDate(value) {
 }
 
 function amountsInLine(line) {
-  const pattern = /(?:eur|usd|gbp|chf|\$|£)?\s*(\d{1,4}(?:[ .]\d{3})*(?:[,.]\d{2}))\s*(?:eur|usd|gbp|chf|\$|£)?/gi;
+  const pattern = /(?:eur|usd|gbp|chf|\$|£)?\s*(\d{1,4}(?:[ .]\d{3})*(?:[,.]\d{2,3}))\s*(?:eur|usd|gbp|chf|\$|£)?/gi;
   return Array.from(line.matchAll(pattern)).map((match) => normalizeAmount(match[1])).filter((amount) => Number.isFinite(amount));
 }
 
 function isReceiptMetadataLine(line) {
   return /(summe|gesamt|total|betrag|zu zahlen|subtotal|zwischensumme|mwst|ust|vat|steuer|tax|visa|mastercard|maestro|amex|karte|card|ec-|girocard|bar|cash|gegeben|rueckgeld|rückgeld|zurueck|zurück|change|balance|datum|date|zeit|time|bon|beleg|rechnung|terminal|transaktion|trace|auth|iban|bic|ust-id|ustid|tel|telefon|phone|www\.|http|kunden|filiale|öffnungszeiten|oeffnungszeiten)/i.test(line);
+}
+
+function footerStartIndex(lines) {
+  const index = lines.findIndex((line) => /(rueckgeld|rückgeld|steuer|mwst|ust|vat|datum|date|zeit|time|visa|mastercard|maestro|karte|card|ec-|girocard|bar|cash|gegeben|terminal|transaktion)/i.test(line));
+  return index === -1 ? lines.length : index;
 }
 
 function findTotalAmount(lines) {
@@ -130,30 +135,36 @@ function findTotalAmount(lines) {
   });
   if (totalCandidates.length) return totalCandidates.at(-1);
 
-  const allAmounts = lines.flatMap(amountsInLine).filter((amount) => amount > 0 && amount < 10000);
-  return allAmounts.length ? Math.max(...allAmounts) : "";
+  const bodyEnd = footerStartIndex(lines);
+  const bodyAmounts = lines
+    .slice(0, bodyEnd)
+    .filter((line) => !/(tel|telefon|phone|www\.|http|ust|vat|steuer|mwst)/i.test(line))
+    .flatMap(amountsInLine)
+    .filter((amount) => amount > 0 && amount < 500);
+  return bodyAmounts.length ? bodyAmounts.at(-1) : "";
 }
 
 function extractLineItems(lines) {
   const items = [];
-  const priceAtEnd = /(\d{1,4}(?:[ .]\d{3})*(?:[,.]\d{2}))\s*[A-Z]?\s*$/i;
+  const amountPattern = /(?:eur|usd|gbp|chf|\$|£)?\s*(\d{1,4}(?:[ .]\d{3})*(?:[,.]\d{2,3}))\s*(?:eur|usd|gbp|chf|\$|£)?/gi;
 
-  lines.forEach((line) => {
-    if (isReceiptMetadataLine(line) || !priceAtEnd.test(line)) return;
+  lines.slice(0, footerStartIndex(lines)).forEach((line) => {
+    if (isReceiptMetadataLine(line)) return;
     const amounts = amountsInLine(line);
     const totalPrice = amounts.at(-1);
-    if (!totalPrice) return;
+    if (!totalPrice || totalPrice > 200) return;
 
     const quantityMatch = line.match(/(\d+(?:[,.]\d+)?)\s*[*xX]\s*\d{1,4}(?:[,.]\d{2})/);
     const quantity = quantityMatch ? Number(quantityMatch[1].replace(",", ".")) : 1;
     const itemName = line
-      .replace(priceAtEnd, "")
+      .replace(amountPattern, "")
       .replace(/\d+(?:[,.]\d+)?\s*[*xX]\s*\d{1,4}(?:[,.]\d{2})/g, "")
       .replace(/^\d{3,}\s+/, "")
+      .replace(/[^\wÄÖÜäöüß .-]/g, " ")
       .replace(/\s{2,}/g, " ")
       .trim();
 
-    if (!/[a-zA-ZÄÖÜäöüß]{2,}/.test(itemName)) return;
+    if (!/[a-zA-ZÄÖÜäöüß]{2,}/.test(itemName) || itemName.replace(/[^a-zA-ZÄÖÜäöüß]/g, "").length < 3 || !/[aeiouäöüAEIOUÄÖÜ]/.test(itemName)) return;
     items.push({
       item_name: itemName || "[Unclear]",
       item_name_en: itemName || "[Unclear]",
@@ -184,12 +195,14 @@ function parseReceiptByRules(text, fileName = "") {
   const paymentLine = lines.find((line) => /(visa|mastercard|maestro|amex|card|karte|ec|cash|bar|paypal|apple pay|google pay)/i.test(line));
   const telephoneMatch = joined.match(/(?:tel\.?|telefon|phone)[:\s]*([+()0-9][+()0-9\s/-]{5,})/i) || joined.match(/(\+?\d[\d\s()/.-]{7,}\d)/);
   const addressLine = lines.find((line) => /\b\d{5}\b/.test(line) || /\b(strasse|straße|str\.|platz|allee|road|street|st\.)\b/i.test(line));
+  const amount = findTotalAmount(lines);
+  const lineItems = extractLineItems(lines).filter((item) => !amount || item.total_price <= amount + 0.01);
 
   return normalizeParsedReceipt({
     merchant,
     date: normalizeDate(dateMatch?.[0]),
     time: joined.match(/\b([01]?\d|2[0-3]):[0-5]\d\b/)?.[0] || "",
-    amount: findTotalAmount(lines),
+    amount,
     currency: /(?:eur)/i.test(joined) ? "EUR" : "EUR",
     category: "Other",
     tax: amountsInLine(taxLine || "").at(-1) ?? -1,
@@ -198,7 +211,7 @@ function parseReceiptByRules(text, fileName = "") {
     change_amount: amountsInLine(changeLine || "").at(-1) ?? -1,
     telephone: telephoneMatch?.[1]?.trim() || "",
     address: addressLine || "",
-    line_items: extractLineItems(lines),
+    line_items: lineItems,
     notes: ""
   });
 }
