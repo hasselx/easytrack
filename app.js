@@ -132,6 +132,7 @@ const els = {
   categoryChart: document.querySelector("#categoryChart"),
   chartLegend: document.querySelector("#chartLegend"),
   transactionsBody: document.querySelector("#transactionsBody"),
+  transactionCards: document.querySelector("#transactionCards"),
   emptyState: document.querySelector("#emptyState"),
   filterStart: document.querySelector("#filterStart"),
   filterEnd: document.querySelector("#filterEnd"),
@@ -889,6 +890,23 @@ function renderTransactions(expenses) {
       </tr>
     `)
     .join("");
+  els.transactionCards.innerHTML = expenses
+    .map((expense) => `
+      <article class="transaction-card">
+        <div class="transaction-card-main">
+          <div>
+            <strong>${expense.merchant}</strong>
+            <span>${formatDate(expense.date)} · ${expense.category}</span>
+          </div>
+          <strong>${formatMoney(expense.amount, expense.currency)}</strong>
+        </div>
+        <div class="transaction-card-actions">
+          <button class="secondary-button" type="button" data-edit="${expense.id}">Edit</button>
+          <button class="danger-button" type="button" data-delete="${expense.id}">Delete</button>
+        </div>
+      </article>
+    `)
+    .join("");
   els.emptyState.hidden = expenses.length > 0;
 }
 
@@ -1045,7 +1063,7 @@ function parseLineItemsJson(value) {
 
 els.resetFormButton.addEventListener("click", clearForm);
 
-els.transactionsBody.addEventListener("click", (event) => {
+function handleTransactionAction(event) {
   const editId = event.target.dataset.edit;
   const deleteId = event.target.dataset.delete;
 
@@ -1070,7 +1088,10 @@ els.transactionsBody.addEventListener("click", (event) => {
     saveExpenses();
     render();
   }
-});
+}
+
+els.transactionsBody.addEventListener("click", handleTransactionAction);
+els.transactionCards.addEventListener("click", handleTransactionAction);
 
 [els.filterStart, els.filterEnd, els.filterCategory].forEach((filter) => {
   filter.addEventListener("input", render);
