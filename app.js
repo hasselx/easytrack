@@ -403,7 +403,7 @@ function footerStartIndex(lines) {
 function findTotalAmount(lines) {
   const totalCandidates = [];
   lines.forEach((line, index) => {
-    if (/(summe|gesamtbetrag|gesamt|total|zu zahlen)/i.test(line) && !/(rueckgeld|rückgeld|change|balance)/i.test(line)) {
+    if (/(betrag|summe|sum\b|gesamtbetrag|gesamt|total|final|zu zahlen)/i.test(line) && !/(rueckgeld|rückgeld|change|balance)/i.test(line)) {
       const nearby = [line, lines[index + 1] || "", lines[index - 1] || ""].join(" ");
       totalCandidates.push(...amountsInLine(nearby));
     }

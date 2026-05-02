@@ -129,7 +129,7 @@ function footerStartIndex(lines) {
 function findTotalAmount(lines) {
   const totalCandidates = [];
   lines.forEach((line, index) => {
-    if (/(summe|gesamtbetrag|gesamt|total|zu zahlen)/i.test(line) && !/(rueckgeld|rückgeld|change|balance)/i.test(line)) {
+    if (/(betrag|summe|sum\b|gesamtbetrag|gesamt|total|final|zu zahlen)/i.test(line) && !/(rueckgeld|rückgeld|change|balance)/i.test(line)) {
       totalCandidates.push(...amountsInLine([line, lines[index + 1] || "", lines[index - 1] || ""].join(" ")));
     }
   });
@@ -249,7 +249,7 @@ Receipt topology:
 Rules:
 - date must be YYYY-MM-DD or empty string
 - time must be HH:MM or empty string
-- amount is the final receipt total, not phone number, address, tax id, cash paid, or change
+- amount is the final receipt total. Treat Betrag, Summe, Sum, Total, Final, Gesamtbetrag, Gesamt, and Zu zahlen as amount keywords. Do not use phone number, address, tax id, cash paid, returned change, or VAT table values as amount
 - category must be one of Food, Travel, Shopping, Health, Housing, Utilities, Other
 - unknown numeric values must be -1
 - unknown text values must be empty strings
