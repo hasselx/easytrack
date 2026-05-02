@@ -33,21 +33,21 @@
           </a>
           <a href="#login" data-page-link="login">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" /><path d="M10 17l5-5-5-5M15 12H3" /></svg>
-            Login
+            Sign up / Login
           </a>
-          <a href="#dashboard" data-page-link="dashboard">
+          <a href="#dashboard" data-page-link="dashboard" data-private-link>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13h6V4H4v9Zm10 7h6V4h-6v16ZM4 20h6v-5H4v5Z" /></svg>
             User Dashboard
           </a>
-          <a href="#upload" data-page-link="upload">
+          <a href="#upload" data-page-link="upload" data-private-link>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0 4.5 4.5M12 4 7.5 8.5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" /></svg>
             Upload
           </a>
-          <a href="#transactions" data-page-link="transactions">
+          <a href="#transactions" data-page-link="transactions" data-private-link>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14M5 12h14M5 19h14" /></svg>
             Transactions
           </a>
-          <a href="#settings" data-page-link="settings">
+          <a href="#settings" data-page-link="settings" data-private-link>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1A2 2 0 1 1 4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1A2 2 0 1 1 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.6V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1A2 2 0 1 1 19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.1a2 2 0 1 1 0 4H21a1.7 1.7 0 0 0-1.6 1Z" /></svg>
             Settings
           </a>
@@ -79,8 +79,8 @@
               <h1>ReceiptFlow</h1>
               <p>Scan German or English receipts, extract totals and items, then review everything before saving.</p>
               <div class="home-actions">
-                <button class="primary-button" type="button" data-page-button="login">Login</button>
-                <button class="secondary-button" type="button" data-page-button="upload">Scan receipt</button>
+                <button class="primary-button" type="button" data-page-button="login" data-auth-mode="signup">Sign up</button>
+                <button class="secondary-button" type="button" data-page-button="login" data-auth-mode="login">Login</button>
               </div>
             </div>
           </div>
@@ -90,11 +90,19 @@
           <article class="panel auth-panel" aria-labelledby="loginTitle">
             <div class="panel-header">
               <div>
-                <h1 id="loginTitle">Login</h1>
-                <p>Use a local demo profile for this MVP.</p>
+                <h1 id="loginTitle">Sign up</h1>
+                <p id="loginSubtitle">Create a local demo profile for this MVP.</p>
               </div>
             </div>
+            <div class="auth-tabs" aria-label="Authentication mode">
+              <button class="active" type="button" data-auth-toggle="signup">Sign up</button>
+              <button type="button" data-auth-toggle="login">Login</button>
+            </div>
             <form id="loginForm" class="settings-form">
+              <label id="nameField">
+                Name
+                <input id="loginName" type="text" placeholder="Your name" />
+              </label>
               <label>
                 Email
                 <input id="loginEmail" type="email" placeholder="you@example.com" required />
@@ -103,7 +111,7 @@
                 Password
                 <input id="loginPassword" type="password" placeholder="Demo password" required />
               </label>
-              <button class="primary-button" type="submit">Login</button>
+              <button class="primary-button" id="authSubmitButton" type="submit">Create account</button>
             </form>
           </article>
         </section>
@@ -114,6 +122,7 @@
               <h1>User Dashboard</h1>
               <p>Track spending from confirmed receipt entries.</p>
             </div>
+            <button class="secondary-button" type="button" data-page-button="upload">Scan receipt</button>
           </header>
 
           <div class="section-grid metrics-grid" aria-label="Dashboard metrics">

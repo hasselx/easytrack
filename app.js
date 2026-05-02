@@ -79,9 +79,16 @@ const els = {
   pageTitle: document.querySelector("#pageTitle"),
   pageLinks: Array.from(document.querySelectorAll("[data-page-link]")),
   pageButtons: Array.from(document.querySelectorAll("[data-page-button]")),
+  privateLinks: Array.from(document.querySelectorAll("[data-private-link]")),
   pages: Array.from(document.querySelectorAll("[data-page]")),
   loginForm: document.querySelector("#loginForm"),
+  loginTitle: document.querySelector("#loginTitle"),
+  loginSubtitle: document.querySelector("#loginSubtitle"),
+  loginName: document.querySelector("#loginName"),
   loginEmail: document.querySelector("#loginEmail"),
+  nameField: document.querySelector("#nameField"),
+  authSubmitButton: document.querySelector("#authSubmitButton"),
+  authToggles: Array.from(document.querySelectorAll("[data-auth-toggle]")),
   receiptLanguage: document.querySelector("#receiptLanguage"),
   languageStatus: document.querySelector("#languageStatus"),
   receiptInput: document.querySelector("#receiptInput"),
@@ -134,6 +141,7 @@ const els = {
 };
 
 let cameraStream = null;
+let authMode = "signup";
 
 function loadExpenses() {
   try {
@@ -156,6 +164,36 @@ function setReceiptLanguage(language) {
   localStorage.setItem(LANGUAGE_KEY, normalized);
   els.receiptLanguage.value = normalized;
   els.languageStatus.textContent = normalized === "de" ? "German" : "English";
+}
+
+function getUser() {
+  try {
+    return JSON.parse(localStorage.getItem(USER_KEY));
+  } catch {
+    return null;
+  }
+}
+
+function isAuthenticated() {
+  return Boolean(getUser()?.email);
+}
+
+function updateAuthUi() {
+  const authed = isAuthenticated();
+  els.privateLinks.forEach((link) => {
+    link.hidden = !authed;
+  });
+}
+
+function setAuthMode(mode) {
+  authMode = mode === "login" ? "login" : "signup";
+  els.loginTitle.textContent = authMode === "signup" ? "Sign up" : "Login";
+  els.loginSubtitle.textContent = authMode === "signup" ? "Create a local demo profile for this MVP." : "Login to your local demo profile.";
+  els.authSubmitButton.textContent = authMode === "signup" ? "Create account" : "Login";
+  els.nameField.hidden = authMode === "login";
+  els.authToggles.forEach((button) => {
+    button.classList.toggle("active", button.dataset.authToggle === authMode);
+  });
 }
 
 function updateVisionSettings() {
@@ -236,7 +274,12 @@ function setBadge(text, mode = "ready") {
 }
 
 function setPage(page) {
-  const knownPage = els.pages.some((item) => item.dataset.page === page) ? page : "home";
+  const privatePages = ["dashboard", "upload", "transactions", "settings"];
+  let knownPage = els.pages.some((item) => item.dataset.page === page) ? page : "home";
+  if (privatePages.includes(knownPage) && !isAuthenticated()) {
+    knownPage = "login";
+    history.replaceState(null, "", "#login");
+  }
   state.activePage = knownPage;
   els.pages.forEach((item) => item.classList.toggle("active", item.dataset.page === knownPage));
   els.pageLinks.forEach((link) => link.classList.toggle("active", link.dataset.pageLink === knownPage));
@@ -249,6 +292,7 @@ function setPage(page) {
     settings: "Settings"
   };
   els.pageTitle.textContent = titles[knownPage] || "Home";
+  updateAuthUi();
   closeMenu();
 }
 
@@ -877,14 +921,30 @@ els.pageLinks.forEach((link) => {
 els.pageButtons.forEach((button) => {
   button.addEventListener("click", () => {
     const page = button.dataset.pageButton;
+    if (button.dataset.authMode) setAuthMode(button.dataset.authMode);
     history.pushState(null, "", `#${page}`);
     setPage(page);
   });
 });
 
+els.authToggles.forEach((button) => {
+  button.addEventListener("click", () => {
+    setAuthMode(button.dataset.authToggle);
+  });
+});
+
 els.loginForm.addEventListener("submit", (event) => {
   event.preventDefault();
-  localStorage.setItem(USER_KEY, JSON.stringify({ email: els.loginEmail.value.trim(), loggedInAt: new Date().toISOString() }));
+  localStorage.setItem(
+    USER_KEY,
+    JSON.stringify({
+      name: els.loginName.value.trim(),
+      email: els.loginEmail.value.trim(),
+      mode: authMode,
+      loggedInAt: new Date().toISOString()
+    })
+  );
+  updateAuthUi();
   history.pushState(null, "", "#dashboard");
   setPage("dashboard");
 });
@@ -1027,6 +1087,8 @@ els.seedButton.addEventListener("click", () => {
 
 clearForm();
 setReceiptLanguage(getReceiptLanguage());
+setAuthMode("signup");
+updateAuthUi();
 updateVisionSettings();
 updateParserSettings();
 setPage(location.hash.replace("#", "") || "home");
