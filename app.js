@@ -1,4 +1,6 @@
 const STORAGE_KEY = "receiptflow.expenses.v1";
+const LANGUAGE_KEY = "receiptflow.receiptLanguage.v1";
+const USER_KEY = "receiptflow.user.v1";
 const categoryColors = {
   Food: "#2f8f68",
   Travel: "#167d8f",
@@ -76,7 +78,12 @@ const els = {
   menuButton: document.querySelector("#menuButton"),
   pageTitle: document.querySelector("#pageTitle"),
   pageLinks: Array.from(document.querySelectorAll("[data-page-link]")),
+  pageButtons: Array.from(document.querySelectorAll("[data-page-button]")),
   pages: Array.from(document.querySelectorAll("[data-page]")),
+  loginForm: document.querySelector("#loginForm"),
+  loginEmail: document.querySelector("#loginEmail"),
+  receiptLanguage: document.querySelector("#receiptLanguage"),
+  languageStatus: document.querySelector("#languageStatus"),
   receiptInput: document.querySelector("#receiptInput"),
   openCameraButton: document.querySelector("#openCameraButton"),
   closeCameraButton: document.querySelector("#closeCameraButton"),
@@ -138,6 +145,17 @@ function loadExpenses() {
 
 function saveExpenses() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state.expenses));
+}
+
+function getReceiptLanguage() {
+  return localStorage.getItem(LANGUAGE_KEY) || "de";
+}
+
+function setReceiptLanguage(language) {
+  const normalized = language === "en" ? "en" : "de";
+  localStorage.setItem(LANGUAGE_KEY, normalized);
+  els.receiptLanguage.value = normalized;
+  els.languageStatus.textContent = normalized === "de" ? "German" : "English";
 }
 
 function updateVisionSettings() {
@@ -218,11 +236,19 @@ function setBadge(text, mode = "ready") {
 }
 
 function setPage(page) {
-  const knownPage = els.pages.some((item) => item.dataset.page === page) ? page : "dashboard";
+  const knownPage = els.pages.some((item) => item.dataset.page === page) ? page : "home";
   state.activePage = knownPage;
   els.pages.forEach((item) => item.classList.toggle("active", item.dataset.page === knownPage));
   els.pageLinks.forEach((link) => link.classList.toggle("active", link.dataset.pageLink === knownPage));
-  els.pageTitle.textContent = knownPage === "upload" ? "Scan Receipt" : knownPage[0].toUpperCase() + knownPage.slice(1);
+  const titles = {
+    home: "Home",
+    login: "Login",
+    dashboard: "Dashboard",
+    upload: "Scan Receipt",
+    transactions: "Transactions",
+    settings: "Settings"
+  };
+  els.pageTitle.textContent = titles[knownPage] || "Home";
   closeMenu();
 }
 
@@ -440,7 +466,7 @@ async function parseReceiptWithAi(text, fileName = "") {
     headers: {
       "Content-Type": "application/json"
     },
-    body: JSON.stringify({ text, fileName })
+    body: JSON.stringify({ text, fileName, language: getReceiptLanguage() })
   });
   const payload = await response.json();
   if (!response.ok || payload.error) {
@@ -476,7 +502,7 @@ async function runImageOcr(file) {
     throw new Error("OCR engine is still loading. Try again in a moment.");
   }
 
-  const result = await window.Tesseract.recognize(ocrImage, "eng", {
+  const result = await window.Tesseract.recognize(ocrImage, getReceiptLanguage() === "de" ? "deu+eng" : "eng", {
     logger(progress) {
       if (progress.status === "recognizing text") {
         setBadge(`${Math.round(progress.progress * 100)}%`, "busy");
@@ -848,8 +874,27 @@ els.pageLinks.forEach((link) => {
   });
 });
 
+els.pageButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    const page = button.dataset.pageButton;
+    history.pushState(null, "", `#${page}`);
+    setPage(page);
+  });
+});
+
+els.loginForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  localStorage.setItem(USER_KEY, JSON.stringify({ email: els.loginEmail.value.trim(), loggedInAt: new Date().toISOString() }));
+  history.pushState(null, "", "#dashboard");
+  setPage("dashboard");
+});
+
+els.receiptLanguage.addEventListener("change", () => {
+  setReceiptLanguage(els.receiptLanguage.value);
+});
+
 window.addEventListener("popstate", () => {
-  setPage(location.hash.replace("#", "") || "dashboard");
+  setPage(location.hash.replace("#", "") || "home");
 });
 
 els.dropZone.addEventListener("dragover", (event) => {
@@ -940,21 +985,6 @@ function parseLineItemsJson(value) {
 
 els.resetFormButton.addEventListener("click", clearForm);
 
-els.visionForm.addEventListener("submit", (event) => {
-  event.preventDefault();
-  const key = els.visionApiKey.value.trim();
-  if (!key) return;
-  localStorage.setItem(VISION_KEY_STORAGE, key);
-  els.visionApiKey.value = "";
-  updateVisionSettings();
-});
-
-els.clearVisionKeyButton.addEventListener("click", () => {
-  localStorage.removeItem(VISION_KEY_STORAGE);
-  els.visionApiKey.value = "";
-  updateVisionSettings();
-});
-
 els.transactionsBody.addEventListener("click", (event) => {
   const editId = event.target.dataset.edit;
   const deleteId = event.target.dataset.delete;
@@ -996,7 +1026,8 @@ els.seedButton.addEventListener("click", () => {
 });
 
 clearForm();
+setReceiptLanguage(getReceiptLanguage());
 updateVisionSettings();
 updateParserSettings();
-setPage(location.hash.replace("#", "") || "dashboard");
+setPage(location.hash.replace("#", "") || "home");
 render();

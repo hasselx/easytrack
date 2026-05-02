@@ -240,6 +240,34 @@ h2 {
   max-width: 760px;
 }
 
+.home-hero,
+.auth-panel {
+  max-width: 760px;
+}
+
+.home-hero {
+  min-height: calc(100vh - 56px);
+  display: grid;
+  align-items: center;
+}
+
+.home-hero h1 {
+  font-size: 48px;
+}
+
+.home-hero p {
+  max-width: 620px;
+  color: var(--muted);
+  font-size: 18px;
+  line-height: 1.5;
+}
+
+.home-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+}
+
 .panel,
 .metric {
   background: var(--surface);
@@ -748,6 +776,18 @@ th:last-child {
 
   h1 {
     font-size: 30px;
+  }
+
+  .home-hero {
+    min-height: calc(100vh - 110px);
+  }
+
+  .home-hero h1 {
+    font-size: 36px;
+  }
+
+  .home-actions {
+    display: grid;
   }
 
   .metrics-grid,

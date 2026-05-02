@@ -5,6 +5,8 @@ A static MVP prototype for uploading receipts, reviewing extracted expense data,
 ## Features
 
 - Mobile-style app navigation with a hamburger menu.
+- Homepage, local demo login, user dashboard, transactions, and settings screens.
+- Receipt language preference for German or English parsing.
 - Upload a receipt image, choose a file, or take a photo on mobile.
 - Server-side Google Cloud Vision OCR through `/api/vision-ocr`.
 - Server-side AI receipt understanding through `/api/parse-receipt` using Hugging Face, with optional OpenAI fallback.

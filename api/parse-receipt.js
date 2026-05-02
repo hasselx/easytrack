@@ -227,11 +227,18 @@ function mergeParsedReceipt(aiParsed, ruleParsed) {
   return normalizeParsedReceipt(merged);
 }
 
-function receiptPrompt(text, fileName) {
+function receiptPrompt(text, fileName, language = "de") {
+  const languageInstruction =
+    language === "de"
+      ? "The receipt is expected to be German. Interpret German retail terms first: Summe, Gesamtbetrag, Rückgeld, Steuer, MwSt, Bar, Karte, Datum, Zeit. Do not force English linguistic assumptions onto item names."
+      : "The receipt is expected to be English. Interpret English receipt terms first, but still handle German words if present.";
   return `Extract structured receipt expense data as valid JSON only.
 
 Return exactly these keys:
 merchant, date, time, amount, currency, category, tax, payment_method, cash_paid, change_amount, telephone, address, line_items, notes.
+
+Language:
+- ${languageInstruction}
 
 Receipt topology:
 - Header: store name, branch address, phone or website.
@@ -276,7 +283,7 @@ function extractJson(text) {
   return JSON.parse(cleaned.slice(start, end + 1));
 }
 
-async function parseWithHuggingFace(text, fileName) {
+async function parseWithHuggingFace(text, fileName, language) {
   const apiKey = process.env.HUGGINGFACE_API_KEY;
   if (!apiKey) {
     throw new Error("HUGGINGFACE_API_KEY is not configured on the server.");
@@ -290,7 +297,7 @@ async function parseWithHuggingFace(text, fileName) {
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
-      inputs: receiptPrompt(text, fileName),
+      inputs: receiptPrompt(text, fileName, language),
       parameters: {
         max_new_tokens: 350,
         temperature: 0.1,
@@ -311,7 +318,7 @@ async function parseWithHuggingFace(text, fileName) {
   return normalizeParsedReceipt(extractJson(generated));
 }
 
-async function parseWithOpenAI(text, fileName) {
+async function parseWithOpenAI(text, fileName, language) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     throw new Error("OPENAI_API_KEY is not configured on the server.");
@@ -329,7 +336,7 @@ async function parseWithOpenAI(text, fileName) {
         {
           role: "system",
           content:
-            "You extract structured expense data from noisy OCR German retail receipt text. Use receipt topology: header has store, address, phone; body has purchased items; footer has Summe/total, payment, date, and time. Distinguish final total from item prices, phone numbers, addresses, tax IDs, cash tendered, and returned change. For line items, capture quantity from multipliers like '2 * 2,49' and total_price as the final calculated line price. Exclude subtotals, tax breakdowns, VAT IDs, payment lines, phone, address, and receipt metadata from line_items. Use -1 for unknown numeric values, empty strings for unknown text values, and '[Unclear]' for obscured item fields."
+            `You extract structured expense data from noisy OCR receipt text. Receipt language preference: ${language === "de" ? "German first" : "English first"}. If German, interpret Summe, Gesamt, Rückgeld, Steuer, MwSt, Bar, Karte, Datum, and Zeit before English terms. Use receipt topology: header has store, address, phone; body has purchased items; footer has total, payment, date, and time. Distinguish final total from item prices, phone numbers, addresses, tax IDs, cash tendered, and returned change. For line items, capture quantity from multipliers like '2 * 2,49' and total_price as the final calculated line price. Exclude subtotals, tax breakdowns, VAT IDs, payment lines, phone, address, and receipt metadata from line_items. Use -1 for unknown numeric values, empty strings for unknown text values, and '[Unclear]' for obscured item fields.`
         },
         {
           role: "user",
@@ -379,15 +386,16 @@ export default async function handler(request, response) {
   }
 
   const ruleParsed = parseReceiptByRules(text, request.body?.fileName);
+  const language = request.body?.language === "en" ? "en" : "de";
 
   try {
     let parsed;
     let provider = "";
     if (process.env.HUGGINGFACE_API_KEY) {
-      parsed = await parseWithHuggingFace(text, request.body?.fileName);
+      parsed = await parseWithHuggingFace(text, request.body?.fileName, language);
       provider = "huggingface";
     } else {
-      parsed = await parseWithOpenAI(text, request.body?.fileName);
+      parsed = await parseWithOpenAI(text, request.body?.fileName, language);
       provider = "openai";
     }
     return response.status(200).json({ ...mergeParsedReceipt(parsed, ruleParsed), provider });

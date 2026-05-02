@@ -27,9 +27,17 @@
         </div>
 
         <nav class="nav-list" aria-label="Sections">
-          <a href="#dashboard" class="active" data-page-link="dashboard">
+          <a href="#home" class="active" data-page-link="home">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11 12 4l9 7" /><path d="M5 10v10h14V10" /></svg>
+            Home
+          </a>
+          <a href="#login" data-page-link="login">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" /><path d="M10 17l5-5-5-5M15 12H3" /></svg>
+            Login
+          </a>
+          <a href="#dashboard" data-page-link="dashboard">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13h6V4H4v9Zm10 7h6V4h-6v16ZM4 20h6v-5H4v5Z" /></svg>
-            Dashboard
+            User Dashboard
           </a>
           <a href="#upload" data-page-link="upload">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0 4.5 4.5M12 4 7.5 8.5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" /></svg>
@@ -59,16 +67,51 @@
           <button class="icon-button" id="menuButton" type="button" title="Open menu" aria-label="Open menu" aria-controls="sidebar">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
           </button>
-          <strong id="pageTitle">Dashboard</strong>
+          <strong id="pageTitle">Home</strong>
           <button class="icon-button" id="seedButton" type="button" title="Load sample data" aria-label="Load sample data">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M7 4v6M17 4v6M6 14h12M8 18h8" /></svg>
           </button>
         </header>
 
-        <section class="app-page active" id="dashboard" data-page="dashboard">
+        <section class="app-page active" id="home" data-page="home">
+          <div class="home-hero">
+            <div>
+              <h1>ReceiptFlow</h1>
+              <p>Scan German or English receipts, extract totals and items, then review everything before saving.</p>
+              <div class="home-actions">
+                <button class="primary-button" type="button" data-page-button="login">Login</button>
+                <button class="secondary-button" type="button" data-page-button="upload">Scan receipt</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="app-page" id="login" data-page="login">
+          <article class="panel auth-panel" aria-labelledby="loginTitle">
+            <div class="panel-header">
+              <div>
+                <h1 id="loginTitle">Login</h1>
+                <p>Use a local demo profile for this MVP.</p>
+              </div>
+            </div>
+            <form id="loginForm" class="settings-form">
+              <label>
+                Email
+                <input id="loginEmail" type="email" placeholder="you@example.com" required />
+              </label>
+              <label>
+                Password
+                <input id="loginPassword" type="password" placeholder="Demo password" required />
+              </label>
+              <button class="primary-button" type="submit">Login</button>
+            </form>
+          </article>
+        </section>
+
+        <section class="app-page" id="dashboard" data-page="dashboard">
           <header class="topbar">
             <div>
-              <h1>Dashboard</h1>
+              <h1>User Dashboard</h1>
               <p>Track spending from confirmed receipt entries.</p>
             </div>
           </header>
@@ -332,6 +375,26 @@
               <p>Connect OCR services for better receipt extraction.</p>
             </div>
           </header>
+
+          <article class="panel settings-panel" aria-labelledby="visionTitle">
+            <div class="panel-header">
+              <div>
+                <h2 id="languageTitle">Receipt Language</h2>
+                <p>Select the receipt language so OCR and parsing use the right assumptions.</p>
+              </div>
+              <span id="languageStatus" class="badge">German</span>
+            </div>
+
+            <div class="settings-form">
+              <label>
+                Default receipt language
+                <select id="receiptLanguage">
+                  <option value="de">German</option>
+                  <option value="en">English</option>
+                </select>
+              </label>
+            </div>
+          </article>
 
           <article class="panel settings-panel" aria-labelledby="visionTitle">
             <div class="panel-header">
