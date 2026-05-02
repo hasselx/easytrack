@@ -129,8 +129,9 @@ function footerStartIndex(lines) {
 function findTotalAmount(lines) {
   const totalCandidates = [];
   lines.forEach((line, index) => {
-    if (/(betrag|summe|sum\b|gesamtbetrag|gesamt|total|final|zu zahlen)/i.test(line) && !/(rueckgeld|rückgeld|change|balance)/i.test(line)) {
-      totalCandidates.push(...amountsInLine([line, lines[index + 1] || "", lines[index - 1] || ""].join(" ")));
+    if (/(betrag|beitrag|summe|sum\b|gesamtbetrag|gesamt|total|final|zu zahlen)/i.test(line) && !/(rueckgeld|rückgeld|change|balance)/i.test(line)) {
+      const sameLineAmounts = amountsInLine(line);
+      totalCandidates.push(...(sameLineAmounts.length ? sameLineAmounts : amountsInLine([lines[index + 1] || "", lines[index - 1] || ""].join(" "))));
     }
   });
   if (totalCandidates.length) return totalCandidates.at(-1);
@@ -249,7 +250,7 @@ Receipt topology:
 Rules:
 - date must be YYYY-MM-DD or empty string
 - time must be HH:MM or empty string
-- amount is the final receipt total. Treat Betrag, Summe, Sum, Total, Final, Gesamtbetrag, Gesamt, and Zu zahlen as amount keywords. Do not use phone number, address, tax id, cash paid, returned change, or VAT table values as amount
+- amount is the final receipt total. Treat Betrag, OCR typo Beitrag, Summe, Sum, Total, Final, Gesamtbetrag, Gesamt, and Zu zahlen as amount keywords. Do not use phone number, address, tax id, cash paid, returned change, or VAT table values as amount
 - category must be one of Food, Travel, Shopping, Health, Housing, Utilities, Other
 - unknown numeric values must be -1
 - unknown text values must be empty strings

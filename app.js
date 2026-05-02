@@ -403,9 +403,9 @@ function footerStartIndex(lines) {
 function findTotalAmount(lines) {
   const totalCandidates = [];
   lines.forEach((line, index) => {
-    if (/(betrag|summe|sum\b|gesamtbetrag|gesamt|total|final|zu zahlen)/i.test(line) && !/(rueckgeld|rückgeld|change|balance)/i.test(line)) {
-      const nearby = [line, lines[index + 1] || "", lines[index - 1] || ""].join(" ");
-      totalCandidates.push(...amountsInLine(nearby));
+    if (/(betrag|beitrag|summe|sum\b|gesamtbetrag|gesamt|total|final|zu zahlen)/i.test(line) && !/(rueckgeld|rückgeld|change|balance)/i.test(line)) {
+      const sameLineAmounts = amountsInLine(line);
+      totalCandidates.push(...(sameLineAmounts.length ? sameLineAmounts : amountsInLine([lines[index + 1] || "", lines[index - 1] || ""].join(" "))));
     }
   });
 
