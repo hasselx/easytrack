@@ -569,20 +569,26 @@ h2 {
 
 .chart-layout {
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
-  gap: 22px;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 20px;
   align-items: center;
 }
 
 canvas {
   width: 100%;
-  max-width: 280px;
+  max-width: 300px;
   aspect-ratio: 1;
+}
+
+.donut-wrap {
+  display: grid;
+  place-items: center;
+  padding: 6px;
 }
 
 .legend {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .legend-row {
@@ -590,13 +596,62 @@ canvas {
   grid-template-columns: 12px minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
-  color: var(--muted);
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--ink);
+  background: #fff;
 }
 
 .legend-dot {
   width: 12px;
   height: 12px;
   border-radius: 50%;
+}
+
+.legend-row span:nth-child(2) {
+  display: grid;
+  gap: 2px;
+  font-weight: 750;
+}
+
+.legend-row small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.legend-row strong {
+  font-size: 14px;
+}
+
+.chart-footer {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.chart-footer div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink);
+  font-weight: 800;
+}
+
+.chart-footer svg,
+.chart-footer i {
+  width: 16px;
+  height: 16px;
+  color: var(--green);
+}
+
+.chart-footer p {
+  margin: 0;
 }
 
 .expense-form {

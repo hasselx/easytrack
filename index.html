@@ -151,12 +151,21 @@
             <div class="panel-header">
               <div>
                 <h2 id="categoryChartTitle">Category Breakdown</h2>
-                <p>Saved expenses by category</p>
+                <p>Current filtered spend</p>
               </div>
             </div>
             <div class="chart-layout">
-              <canvas id="categoryChart" width="280" height="280" aria-label="Category breakdown chart"></canvas>
+              <div class="donut-wrap">
+                <canvas id="categoryChart" width="320" height="320" aria-label="Category breakdown chart"></canvas>
+              </div>
               <div id="chartLegend" class="legend"></div>
+            </div>
+            <div class="chart-footer">
+              <div>
+                <i data-lucide="trending-up"></i>
+                <span id="chartTrend">Ready for your first receipt</span>
+              </div>
+              <p>Showing saved expenses by selected filters</p>
             </div>
           </article>
           <article class="panel dashboard-focus" aria-labelledby="quickActionsTitle">

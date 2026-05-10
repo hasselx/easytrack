@@ -133,6 +133,7 @@ const els = {
   topCategoryAmount: document.querySelector("#topCategoryAmount"),
   categoryChart: document.querySelector("#categoryChart"),
   chartLegend: document.querySelector("#chartLegend"),
+  chartTrend: document.querySelector("#chartTrend"),
   transactionsBody: document.querySelector("#transactionsBody"),
   transactionCards: document.querySelector("#transactionCards"),
   emptyState: document.querySelector("#emptyState"),
@@ -823,60 +824,69 @@ function drawChart(expenses) {
   const ctx = els.categoryChart.getContext("2d");
   const size = els.categoryChart.width;
   const center = size / 2;
-  const radius = center - 12;
+  const radius = center - 18;
+  const ringWidth = 34;
   const totals = totalsByCategory(expenses);
   const entries = Object.entries(totals).filter(([, amount]) => amount > 0);
   const grandTotal = entries.reduce((sum, [, amount]) => sum + amount, 0);
 
   ctx.clearRect(0, 0, size, size);
+  ctx.lineCap = "round";
 
   if (!entries.length) {
     ctx.beginPath();
-    ctx.arc(center, center, radius, 0, Math.PI * 2);
-    ctx.fillStyle = "#eef1ed";
-    ctx.fill();
+    ctx.arc(center, center, radius - ringWidth / 2, 0, Math.PI * 2);
+    ctx.strokeStyle = "#eef1ed";
+    ctx.lineWidth = ringWidth;
+    ctx.stroke();
     ctx.fillStyle = "#66717a";
-    ctx.font = "700 16px system-ui";
+    ctx.font = "800 18px system-ui";
     ctx.textAlign = "center";
-    ctx.fillText("No data", center, center + 5);
+    ctx.fillText("€0.00", center, center - 3);
+    ctx.font = "600 13px system-ui";
+    ctx.fillText("Total spend", center, center + 20);
     els.chartLegend.innerHTML = '<p class="empty-state">Save expenses to build the chart.</p>';
+    els.chartTrend.textContent = "Ready for your first receipt";
     return;
   }
 
   let start = -Math.PI / 2;
-  entries.forEach(([category, amount]) => {
+  entries
+    .sort((a, b) => b[1] - a[1])
+    .forEach(([category, amount]) => {
     const angle = (amount / grandTotal) * Math.PI * 2;
     ctx.beginPath();
-    ctx.moveTo(center, center);
-    ctx.arc(center, center, radius, start, start + angle);
-    ctx.closePath();
-    ctx.fillStyle = categoryColors[category] || categoryColors.Other;
-    ctx.fill();
+    ctx.arc(center, center, radius - ringWidth / 2, start + 0.015, start + angle - 0.015);
+    ctx.strokeStyle = categoryColors[category] || categoryColors.Other;
+    ctx.lineWidth = ringWidth;
+    ctx.stroke();
     start += angle;
   });
 
-  ctx.beginPath();
-  ctx.arc(center, center, radius * 0.58, 0, Math.PI * 2);
-  ctx.fillStyle = "#ffffff";
-  ctx.fill();
   ctx.fillStyle = "#182027";
-  ctx.font = "800 20px system-ui";
+  ctx.font = "900 24px system-ui";
   ctx.textAlign = "center";
-  ctx.fillText(formatMoney(grandTotal, "EUR"), center, center + 6);
+  ctx.fillText(formatMoney(grandTotal, "EUR"), center, center - 4);
+  ctx.fillStyle = "#66717a";
+  ctx.font = "650 13px system-ui";
+  ctx.fillText("Total spend", center, center + 22);
 
   els.chartLegend.innerHTML = entries
     .sort((a, b) => b[1] - a[1])
     .map(([category, amount]) => {
       const color = categoryColors[category] || categoryColors.Other;
+      const percent = Math.round((amount / grandTotal) * 100);
       return `
         <div class="legend-row">
           <span class="legend-dot" style="background:${color}"></span>
-          <span>${category}</span>
+          <span>${category}<small>${percent}%</small></span>
           <strong>${formatMoney(amount, "EUR")}</strong>
         </div>
       `;
     })
     .join("");
+  els.chartTrend.textContent = `Top category: ${entries.sort((a, b) => b[1] - a[1])[0][0]}`;
+  refreshIcons();
 }
 
 function updateMetrics(expenses) {
