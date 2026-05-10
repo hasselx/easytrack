@@ -75,6 +75,8 @@ const state = {
 const els = {
   sidebar: document.querySelector("#sidebar"),
   scrim: document.querySelector("#scrim"),
+  publicHeader: document.querySelector("#publicHeader"),
+  mobileAppbar: document.querySelector("#mobileAppbar"),
   menuButton: document.querySelector("#menuButton"),
   pageTitle: document.querySelector("#pageTitle"),
   pageLinks: Array.from(document.querySelectorAll("[data-page-link]")),
@@ -186,6 +188,10 @@ function updateAuthUi() {
   });
 }
 
+function refreshIcons() {
+  if (window.lucide) window.lucide.createIcons();
+}
+
 function setAuthMode(mode) {
   authMode = mode === "login" ? "login" : "signup";
   els.loginTitle.textContent = authMode === "signup" ? "Sign up" : "Login";
@@ -293,7 +299,9 @@ function setPage(page) {
     settings: "Settings"
   };
   els.pageTitle.textContent = titles[knownPage] || "Home";
+  document.body.classList.toggle("public-view", !privatePages.includes(knownPage));
   updateAuthUi();
+  refreshIcons();
   closeMenu();
 }
 
@@ -1114,3 +1122,4 @@ updateVisionSettings();
 updateParserSettings();
 setPage(location.hash.replace("#", "") || "home");
 render();
+refreshIcons();
