@@ -828,14 +828,25 @@ function updateMetrics(expenses) {
 function renderTransactions(expenses) {
   els.transactionsBody.innerHTML = expenses
     .map((expense) => `
-      <tr>
-        <td>${formatDate(expense.date)}</td>
-        <td>${expense.merchant}</td>
-        <td><span class="category-pill">${expense.category}</span></td>
-        <td>${formatMoney(expense.amount, expense.currency)}</td>
+      <tr data-row-id="${expense.id}">
         <td>
-          <button class="secondary-button" type="button" data-edit="${expense.id}">Edit</button>
-          <button class="danger-button" type="button" data-delete="${expense.id}">Delete</button>
+          <span class="status-chip">Saved</span>
+        </td>
+        <td>
+          <div class="merchant-cell">
+            <strong>${expense.merchant}</strong>
+            <span>${formatDate(expense.date)}</span>
+          </div>
+        </td>
+        <td><span class="category-pill">${expense.category}</span></td>
+        <td class="amount-cell">${formatMoney(expense.amount, expense.currency)}</td>
+        <td class="row-actions">
+          <button class="icon-button compact" type="button" data-edit="${expense.id}" aria-label="Edit ${expense.merchant}">
+            <i data-lucide="pencil"></i>
+          </button>
+          <button class="icon-button compact danger-icon" type="button" data-delete="${expense.id}" aria-label="Delete ${expense.merchant}">
+            <i data-lucide="trash-2"></i>
+          </button>
         </td>
       </tr>
     `)
@@ -850,6 +861,7 @@ function renderTransactions(expenses) {
           </div>
           <strong>${formatMoney(expense.amount, expense.currency)}</strong>
         </div>
+        <span class="status-chip">Saved</span>
         <div class="transaction-card-actions">
           <button class="secondary-button" type="button" data-edit="${expense.id}">Edit</button>
           <button class="danger-button" type="button" data-delete="${expense.id}">Delete</button>
@@ -858,6 +870,7 @@ function renderTransactions(expenses) {
     `)
     .join("");
   els.emptyState.hidden = expenses.length > 0;
+  refreshIcons();
 }
 
 function render() {

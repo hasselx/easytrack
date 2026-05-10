@@ -767,6 +767,13 @@ textarea:focus {
   overflow-x: auto;
 }
 
+.data-table-shell {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+}
+
 .transaction-cards {
   display: none;
 }
@@ -826,24 +833,81 @@ textarea:focus {
 table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 680px;
+  min-width: 720px;
 }
 
 th,
 td {
-  padding: 13px 10px;
+  padding: 12px 14px;
   text-align: left;
   border-bottom: 1px solid var(--line);
 }
 
 th {
+  background: #f8faf8;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: 0.02em;
 }
 
 td:last-child,
 th:last-child {
   text-align: right;
+}
+
+tbody tr {
+  transition: background 140ms ease;
+}
+
+tbody tr:hover {
+  background: #fbfcfb;
+}
+
+tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.merchant-cell {
+  display: grid;
+  gap: 3px;
+}
+
+.merchant-cell strong {
+  font-size: 14px;
+}
+
+.merchant-cell span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.amount-cell {
+  font-weight: 850;
+  color: var(--ink);
+}
+
+.row-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.icon-button.compact {
+  width: 34px;
+  min-height: 34px;
+  box-shadow: none;
+  background: #fff;
+}
+
+.icon-button.compact svg,
+.icon-button.compact i {
+  width: 15px;
+  height: 15px;
+}
+
+.danger-icon {
+  color: var(--red);
 }
 
 .category-pill {
@@ -852,9 +916,24 @@ th:last-child {
   align-items: center;
   padding: 0 10px;
   border-radius: 999px;
-  background: var(--surface-muted);
+  background: #eef6f1;
+  color: var(--green);
   font-size: 13px;
   font-weight: 800;
+}
+
+.status-chip {
+  display: inline-flex;
+  min-height: 26px;
+  align-items: center;
+  width: fit-content;
+  padding: 0 9px;
+  border-radius: 999px;
+  border: 1px solid #dbe8df;
+  background: #f4faf6;
+  color: var(--green);
+  font-size: 12px;
+  font-weight: 850;
 }
 
 .empty-state {
@@ -994,6 +1073,10 @@ th:last-child {
   }
 
   .transactions-panel .table-wrap {
+    display: none;
+  }
+
+  .transactions-panel .data-table-shell {
     display: none;
   }
 
