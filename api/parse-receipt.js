@@ -117,6 +117,18 @@ function amountsInLine(line) {
   return Array.from(line.matchAll(pattern)).map((match) => normalizeAmount(match[1])).filter((amount) => Number.isFinite(amount));
 }
 
+function priceAmountsInLine(line) {
+  const pattern = /(?:eur|usd|gbp|chf|\$|£)?\s*(\d{1,4}(?:[ .]\d{3})*(?:[,.]\d{2,3}))\s*(?:eur|usd|gbp|chf|\$|£)?/gi;
+  return Array.from(line.matchAll(pattern))
+    .filter((match) => {
+      const before = line.slice(Math.max(0, match.index - 4), match.index);
+      const after = line.slice(match.index + match[0].length, match.index + match[0].length + 6);
+      return !/[*xX]\s*$/.test(before) && !/^\s*(kg|g|l|ml|stk|x\b|\*)/i.test(after);
+    })
+    .map((match) => normalizeAmount(match[1]))
+    .filter((amount) => Number.isFinite(amount));
+}
+
 function isReceiptMetadataLine(line) {
   return /(summe|gesamt|total|betrag|zu zahlen|subtotal|zwischensumme|mwst|ust|vat|steuer|tax|visa|mastercard|maestro|amex|karte|card|ec-|girocard|bar|cash|gegeben|rueckgeld|rückgeld|zurueck|zurück|change|balance|datum|date|zeit|time|bon|beleg|rechnung|terminal|transaktion|trace|auth|iban|bic|ust-id|ustid|tel|telefon|phone|www\.|http|kunden|filiale|öffnungszeiten|oeffnungszeiten)/i.test(line);
 }
@@ -151,7 +163,7 @@ function extractLineItems(lines) {
 
   lines.slice(0, footerStartIndex(lines)).forEach((line) => {
     if (isReceiptMetadataLine(line)) return;
-    const amounts = amountsInLine(line);
+    const amounts = priceAmountsInLine(line);
     const totalPrice = amounts.at(-1);
     if (!totalPrice || totalPrice > 200) return;
 

@@ -30,6 +30,18 @@ function amountsInLine(line) {
   return Array.from(line.matchAll(pattern)).map((match) => normalizeAmount(match[1])).filter((amount) => Number.isFinite(amount));
 }
 
+function priceAmountsInLine(line) {
+  const pattern = /(?:eur|usd|gbp|chf|\$|£)?\s*(\d{1,4}(?:[ .]\d{3})*(?:[,.]\d{2,3}))\s*(?:eur|usd|gbp|chf|\$|£)?/gi;
+  return Array.from(line.matchAll(pattern))
+    .filter((match) => {
+      const before = line.slice(Math.max(0, match.index - 4), match.index);
+      const after = line.slice(match.index + match[0].length, match.index + match[0].length + 6);
+      return !/[*xX]\s*$/.test(before) && !/^\s*(kg|g|l|ml|stk|x\b|\*)/i.test(after);
+    })
+    .map((match) => normalizeAmount(match[1]))
+    .filter((amount) => Number.isFinite(amount));
+}
+
 function findTotalAmount(lines) {
   const totalCandidates = [];
   lines.forEach((line, index) => {
@@ -73,4 +85,9 @@ if (merged.amount !== 10.3 || merged.line_items.length !== 2) {
   throw new Error(`Expected rule parser to win. Got ${JSON.stringify(merged)}`);
 }
 
-console.log("Parser regression passed:", total, "items:", merged.line_items.length);
+const weightedLinePrices = priceAmountsInLine("Apfel lose 2 x 0,69 kg 1,38");
+if (weightedLinePrices.length !== 1 || weightedLinePrices[0] !== 1.38) {
+  throw new Error(`Expected only rightmost line price 1.38, got ${JSON.stringify(weightedLinePrices)}`);
+}
+
+console.log("Parser regression passed:", total, "items:", merged.line_items.length, "weighted:", weightedLinePrices[0]);
