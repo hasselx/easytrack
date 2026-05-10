@@ -222,9 +222,15 @@ function mergeParsedReceipt(aiParsed, ruleParsed) {
   ["merchant", "date", "time", "amount", "currency", "tax", "payment_method", "cash_paid", "change_amount", "telephone", "address"].forEach((key) => {
     if (merged[key] === "" || merged[key] == null) merged[key] = ruleParsed[key];
   });
-  if (!Array.isArray(merged.line_items) || merged.line_items.length === 0) {
+
+  if (ruleParsed.amount !== "" && ruleParsed.amount != null) {
+    merged.amount = ruleParsed.amount;
+  }
+
+  if (Array.isArray(ruleParsed.line_items) && ruleParsed.line_items.length > 0) {
     merged.line_items = ruleParsed.line_items;
   }
+
   return normalizeParsedReceipt(merged);
 }
 

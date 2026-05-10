@@ -41,9 +41,36 @@ function findTotalAmount(lines) {
   return totalCandidates.at(-1);
 }
 
+function mergeParsedReceipt(aiParsed, ruleParsed) {
+  const merged = { ...ruleParsed, ...aiParsed };
+  if (ruleParsed.amount !== "" && ruleParsed.amount != null) {
+    merged.amount = ruleParsed.amount;
+  }
+  if (Array.isArray(ruleParsed.line_items) && ruleParsed.line_items.length > 0) {
+    merged.line_items = ruleParsed.line_items;
+  }
+  return merged;
+}
+
 const lines = sample.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
 const total = findTotalAmount(lines);
 if (total !== 10.3) {
   throw new Error(`Expected 10.3, got ${total}`);
 }
-console.log("Parser regression passed:", total);
+
+const merged = mergeParsedReceipt(
+  { amount: 2.79, line_items: [{ item_name: "wrong", total_price: 2.79 }] },
+  {
+    amount: total,
+    line_items: [
+      { item_name: "Milde Satte 11", total_price: 1.39 },
+      { item_name: "Pfand", total_price: 0.25 }
+    ]
+  }
+);
+
+if (merged.amount !== 10.3 || merged.line_items.length !== 2) {
+  throw new Error(`Expected rule parser to win. Got ${JSON.stringify(merged)}`);
+}
+
+console.log("Parser regression passed:", total, "items:", merged.line_items.length);
