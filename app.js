@@ -11,33 +11,6 @@ const categoryColors = {
   Other: "#66717a"
 };
 
-const sampleReceipts = [
-  {
-    merchant: "REWE Berlin Mitte",
-    date: "2026-04-21",
-    amount: 32.48,
-    currency: "EUR",
-    category: "Food",
-    rawText: "REWE Berlin Mitte\nBon Nr. 4821\n21.04.2026\nSumme EUR 32,48\nVielen Dank fuer Ihren Einkauf"
-  },
-  {
-    merchant: "BVG Fahrinfo",
-    date: "2026-04-18",
-    amount: 3.50,
-    currency: "EUR",
-    category: "Travel",
-    rawText: "BVG\nEinzelfahrschein Berlin AB\n18.04.2026\nTotal 3,50 EUR"
-  },
-  {
-    merchant: "dm drogerie markt",
-    date: "2026-04-12",
-    amount: 18.95,
-    currency: "EUR",
-    category: "Health",
-    rawText: "dm drogerie markt\n12.04.2026\nGesamtbetrag 18,95 EUR"
-  }
-];
-
 const receiptExamples = [
   {
     merchant: "EDEKA Friedrichstrasse",
@@ -124,8 +97,6 @@ const els = {
   lineItemsJson: document.querySelector("#lineItemsJson"),
   rawText: document.querySelector("#rawText"),
   resetFormButton: document.querySelector("#resetFormButton"),
-  visionStatus: document.querySelector("#visionStatus"),
-  parserStatus: document.querySelector("#parserStatus"),
   monthlyTotal: document.querySelector("#monthlyTotal"),
   monthlyCount: document.querySelector("#monthlyCount"),
   averageReceipt: document.querySelector("#averageReceipt"),
@@ -141,7 +112,6 @@ const els = {
   filterEnd: document.querySelector("#filterEnd"),
   filterCategory: document.querySelector("#filterCategory"),
   steps: Array.from(document.querySelectorAll("#steps li")),
-  seedButton: document.querySelector("#seedButton")
 };
 
 let cameraStream = null;
@@ -202,56 +172,6 @@ function setAuthMode(mode) {
   els.authToggles.forEach((button) => {
     button.classList.toggle("active", button.dataset.authToggle === authMode);
   });
-}
-
-function updateVisionSettings() {
-  if (location.protocol === "file:") {
-    els.visionStatus.textContent = "Needs deployed server";
-    els.visionStatus.style.background = "#fff7e6";
-    els.visionStatus.style.color = "#8a5d08";
-    return;
-  }
-
-  els.visionStatus.textContent = "Checking";
-  els.visionStatus.style.background = "#eef1ed";
-  els.visionStatus.style.color = "#66717a";
-
-  fetch("/api/vision-ocr")
-    .then((response) => response.json())
-    .then((payload) => {
-      els.visionStatus.textContent = payload.configured ? "Connected" : "Missing key";
-      els.visionStatus.style.background = payload.configured ? "#e8f4ed" : "#fff7e6";
-      els.visionStatus.style.color = payload.configured ? "#2f8f68" : "#8a5d08";
-    })
-    .catch(() => {
-      els.visionStatus.textContent = "Server unavailable";
-      els.visionStatus.style.background = "#fbebea";
-      els.visionStatus.style.color = "#c0564a";
-    });
-}
-
-function setStatusBadge(element, text, mode) {
-  element.textContent = text;
-  element.style.background = mode === "ok" ? "#e8f4ed" : mode === "warn" ? "#fff7e6" : mode === "bad" ? "#fbebea" : "#eef1ed";
-  element.style.color = mode === "ok" ? "#2f8f68" : mode === "warn" ? "#8a5d08" : mode === "bad" ? "#c0564a" : "#66717a";
-}
-
-function updateParserSettings() {
-  if (location.protocol === "file:") {
-    setStatusBadge(els.parserStatus, "Needs deployed server", "warn");
-    return;
-  }
-
-  setStatusBadge(els.parserStatus, "Checking", "neutral");
-  fetch("/api/parse-receipt")
-    .then((response) => response.json())
-    .then((payload) => {
-      const provider = payload.provider === "huggingface" ? "Hugging Face" : payload.provider === "openai" ? "OpenAI" : "";
-      setStatusBadge(els.parserStatus, payload.configured ? provider : "Missing key", payload.configured ? "ok" : "warn");
-    })
-    .catch(() => {
-      setStatusBadge(els.parserStatus, "Server unavailable", "bad");
-    });
 }
 
 function formatMoney(amount, currency = "EUR") {
@@ -1127,21 +1047,10 @@ els.transactionCards.addEventListener("click", handleTransactionAction);
   filter.addEventListener("input", render);
 });
 
-els.seedButton.addEventListener("click", () => {
-  const existingSample = state.expenses.some((expense) => expense.raw_text.includes("Bon Nr. 4821"));
-  if (!existingSample) {
-    state.expenses = [...sampleReceipts.map(createExpense), ...state.expenses];
-    saveExpenses();
-  }
-  render();
-});
-
 clearForm();
 setReceiptLanguage(getReceiptLanguage());
 setAuthMode("signup");
 updateAuthUi();
-updateVisionSettings();
-updateParserSettings();
 setPage(location.hash.replace("#", "") || "home");
 render();
 refreshIcons();

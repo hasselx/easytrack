@@ -133,7 +133,6 @@ svg {
 
 .brand p,
 .brand span,
-.status-panel p,
 .panel-header p,
 .metric span,
 .metric small,
@@ -152,7 +151,21 @@ svg {
 
 .nav-list {
   display: grid;
+  gap: 18px;
+}
+
+.sidebar-group {
+  display: grid;
   gap: 6px;
+}
+
+.sidebar-group > span {
+  padding: 0 10px 4px;
+  color: #8fa09a;
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .nav-list a {
@@ -163,38 +176,16 @@ svg {
   gap: 10px;
   min-height: 42px;
   padding: 0 12px;
-  border-radius: 8px;
+  border-radius: 10px;
   font-weight: 650;
+  transition: background 140ms ease, color 140ms ease, transform 140ms ease;
 }
 
 .nav-list a.active,
 .nav-list a:hover {
   background: #25313a;
   color: #ffffff;
-}
-
-.status-panel {
-  margin-top: auto;
-  display: flex;
-  gap: 10px;
-  padding: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.06);
-}
-
-.status-panel p {
-  color: #b8c5bd;
-  font-size: 13px;
-  line-height: 1.35;
-}
-
-.status-dot {
-  width: 10px;
-  height: 10px;
-  margin-top: 5px;
-  border-radius: 50%;
-  background: #54d18a;
+  transform: translateX(1px);
 }
 
 main {
@@ -901,10 +892,6 @@ th:last-child {
   .nav-list a {
     justify-content: flex-start;
     font-size: 15px;
-  }
-
-  .status-panel {
-    display: flex;
   }
 
   main {

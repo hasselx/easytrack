@@ -39,31 +39,29 @@
         </div>
 
         <nav class="nav-list" aria-label="Sections">
-          <a href="#dashboard" data-page-link="dashboard" data-private-link>
-            <i data-lucide="layout-dashboard"></i>
-            Dashboard
-          </a>
-          <a href="#upload" data-page-link="upload" data-private-link>
-            <i data-lucide="scan-line"></i>
-            Upload
-          </a>
-          <a href="#transactions" data-page-link="transactions" data-private-link>
-            <i data-lucide="list-checks"></i>
-            Transactions
-          </a>
-          <a href="#settings" data-page-link="settings" data-private-link>
-            <i data-lucide="settings"></i>
-            Settings
-          </a>
-        </nav>
-
-        <div class="status-panel">
-          <span class="status-dot"></span>
-          <div>
-            <strong>Local prototype</strong>
-            <p>Data saves in this browser.</p>
+          <div class="sidebar-group">
+            <span>Workspace</span>
+            <a href="#dashboard" data-page-link="dashboard" data-private-link>
+              <i data-lucide="layout-dashboard"></i>
+              Dashboard
+            </a>
+            <a href="#upload" data-page-link="upload" data-private-link>
+              <i data-lucide="scan-line"></i>
+              Upload
+            </a>
+            <a href="#transactions" data-page-link="transactions" data-private-link>
+              <i data-lucide="list-checks"></i>
+              Transactions
+            </a>
           </div>
-        </div>
+          <div class="sidebar-group">
+            <span>Account</span>
+            <a href="#settings" data-page-link="settings" data-private-link>
+              <i data-lucide="settings"></i>
+              Settings
+            </a>
+          </div>
+        </nav>
       </aside>
 
       <main>
@@ -72,9 +70,7 @@
             <i data-lucide="menu"></i>
           </button>
           <strong id="pageTitle">Home</strong>
-          <button class="icon-button" id="seedButton" type="button" title="Load sample data" aria-label="Load sample data">
-            <i data-lucide="sparkles"></i>
-          </button>
+          <span></span>
         </header>
 
         <section class="app-page active" id="home" data-page="home">
@@ -437,49 +433,6 @@
             </div>
           </article>
 
-          <article class="panel settings-panel" aria-labelledby="visionTitle">
-            <div class="panel-header">
-              <div>
-                <h2 id="visionTitle">Google Cloud Vision OCR</h2>
-                <p>The API key belongs in the server environment as GOOGLE_VISION_API_KEY.</p>
-              </div>
-              <span id="visionStatus" class="badge">Server endpoint</span>
-            </div>
-
-            <div class="settings-form">
-              <label>
-                OCR endpoint
-                <input value="/api/vision-ocr" readonly />
-              </label>
-            </div>
-
-            <div class="trust-note">
-              <strong>The browser never sees the Google API key.</strong>
-              <p>Deploy with a serverless host such as Vercel and add GOOGLE_VISION_API_KEY in the project environment variables.</p>
-            </div>
-          </article>
-
-          <article class="panel settings-panel" aria-labelledby="parserTitle">
-            <div class="panel-header">
-              <div>
-                <h2 id="parserTitle">AI Receipt Parser</h2>
-                <p>Uses Hugging Face or OpenAI on the server to separate totals, tax, cash, change, address, telephone, and payment method.</p>
-              </div>
-              <span id="parserStatus" class="badge">Server endpoint</span>
-            </div>
-
-            <div class="settings-form">
-              <label>
-                Parser endpoint
-                <input value="/api/parse-receipt" readonly />
-              </label>
-            </div>
-
-            <div class="trust-note">
-              <strong>The AI key belongs on the server.</strong>
-              <p>Add HUGGINGFACE_API_KEY in Vercel. OPENAI_API_KEY is optional as a fallback.</p>
-            </div>
-          </article>
         </section>
       </main>
     </div>
