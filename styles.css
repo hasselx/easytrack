@@ -263,7 +263,9 @@ h2 {
 }
 
 .review-grid {
-  grid-template-columns: minmax(0, 1fr) 340px;
+  width: 100%;
+  max-width: 900px;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .upload-grid {
@@ -651,6 +653,65 @@ canvas {
   gap: 14px;
 }
 
+.review-panel {
+  padding: 20px;
+}
+
+.review-panel .panel-header {
+  margin-bottom: 14px;
+}
+
+.review-panel .expense-form {
+  gap: 12px;
+}
+
+.review-panel label {
+  gap: 6px;
+  color: #52606a;
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: 0.01em;
+}
+
+.review-panel input,
+.review-panel select,
+.review-panel textarea {
+  min-height: 44px;
+  border-radius: 9px;
+  border-color: #dfe5df;
+  background: #fbfcfb;
+  font-size: 15px;
+  font-weight: 650;
+  transition: border-color 140ms ease, box-shadow 140ms ease, background 140ms ease;
+}
+
+.review-panel input::placeholder,
+.review-panel textarea::placeholder {
+  color: #8b969e;
+  font-weight: 650;
+}
+
+.review-panel input:focus,
+.review-panel select:focus,
+.review-panel textarea:focus {
+  background: #fff;
+}
+
+.review-panel textarea {
+  min-height: 112px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.review-panel #lineItemsJson,
+.review-panel #rawText {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.review-panel .form-actions {
+  padding-top: 4px;
+}
+
 .settings-form {
   display: grid;
   gap: 14px;
@@ -704,17 +765,25 @@ textarea:focus {
   padding: 0;
   list-style: none;
   display: grid;
-  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
   counter-reset: step;
 }
 
 .steps li {
   counter-increment: step;
-  min-height: 42px;
-  display: flex;
+  min-height: 54px;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
   align-items: center;
-  gap: 10px;
+  gap: 9px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
   color: var(--muted);
+  font-size: 13px;
+  font-weight: 750;
 }
 
 .steps li::before {
@@ -733,6 +802,8 @@ textarea:focus {
 .steps li.done {
   color: var(--ink);
   font-weight: 800;
+  border-color: #d7e7dc;
+  background: #f5fbf7;
 }
 
 .steps li.done::before {
@@ -741,11 +812,12 @@ textarea:focus {
 }
 
 .trust-note {
-  margin-top: 22px;
-  padding: 14px;
-  border-radius: 8px;
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 10px;
   background: #fff7e6;
   color: #61440c;
+  font-size: 13px;
 }
 
 .trust-note p {
@@ -1066,6 +1138,30 @@ tbody tr:last-child td {
 
   .panel {
     padding: 14px;
+  }
+
+  .review-panel {
+    padding: 14px;
+  }
+
+  .review-panel .expense-form {
+    gap: 10px;
+  }
+
+  .review-panel input,
+  .review-panel select,
+  .review-panel textarea {
+    min-height: 42px;
+    font-size: 14px;
+  }
+
+  .steps {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .steps li {
+    min-height: 48px;
+    padding: 8px;
   }
 
   .metric {

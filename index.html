@@ -235,7 +235,26 @@
           </div>
 
           <div class="content-grid review-grid">
-            <article class="panel" aria-labelledby="reviewTitle">
+            <article class="panel insights-panel review-flow-panel" aria-labelledby="workflowTitle">
+            <div class="panel-header">
+              <div>
+                <h2 id="workflowTitle">Processing Flow</h2>
+                <p>Current receipt status</p>
+              </div>
+            </div>
+            <ol class="steps" id="steps">
+              <li class="done">Upload receipt</li>
+              <li>Extract OCR text</li>
+              <li>Parse fields</li>
+              <li>Review and save</li>
+            </ol>
+            <div class="trust-note">
+              <strong>Manual review is required.</strong>
+              <p>Saved expenses only update the dashboard after you confirm the extracted data.</p>
+            </div>
+          </article>
+
+            <article class="panel review-panel" aria-labelledby="reviewTitle">
             <div class="panel-header">
               <div>
                 <h2 id="reviewTitle">Review Extracted Data</h2>
@@ -333,25 +352,6 @@
                 <button class="primary-button" type="submit">Save Expense</button>
               </div>
             </form>
-          </article>
-
-            <article class="panel insights-panel" aria-labelledby="workflowTitle">
-            <div class="panel-header">
-              <div>
-                <h2 id="workflowTitle">Processing Flow</h2>
-                <p>Current receipt status</p>
-              </div>
-            </div>
-            <ol class="steps" id="steps">
-              <li class="done">Upload receipt</li>
-              <li>Extract OCR text</li>
-              <li>Parse fields</li>
-              <li>Review and save</li>
-            </ol>
-            <div class="trust-note">
-              <strong>Manual review is required.</strong>
-              <p>Saved expenses only update the dashboard after you confirm the extracted data.</p>
-            </div>
           </article>
           </div>
         </section>
