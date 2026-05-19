@@ -332,6 +332,26 @@ function priceAmountsInLine(line) {
     .filter((amount) => Number.isFinite(amount));
 }
 
+function hasTotalKeyword(line) {
+  return /(betrag|beitrag|summe|sum\b|gesamtbetrag|gesamt|total|final|zu zahlen|endsumme|rechnungsbetrag)/i.test(line);
+}
+
+function isPaymentLine(line) {
+  return /(bezahlung|zahlung|bezahlt|visa|prepaid|debit|mastercard|maestro|amex|girocard|karte|card|ec-|barzahlung|cash|paypal|apple pay|google pay|approved)/i.test(line);
+}
+
+function isChangeOrTaxLine(line) {
+  return /(rueckgeld|rückgeld|change|balance|zurueck|zurück|mwst|ust|vat|steuer|tax)/i.test(line);
+}
+
+function plausibleTotalAmounts(line) {
+  if (isChangeOrTaxLine(line)) return [];
+  if (/\b\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\b/.test(line) && !hasTotalKeyword(line) && !/\b(?:eur|usd|gbp|chf|€|\$|£)\b/i.test(line)) {
+    return [];
+  }
+  return amountsInLine(line).filter((amount) => amount > 0 && amount < 10000);
+}
+
 function isReceiptMetadataLine(line) {
   return /(summe|gesamt|total|betrag|zu zahlen|subtotal|zwischensumme|mwst|ust|vat|steuer|tax|visa|mastercard|maestro|amex|karte|card|ec-|girocard|bar|cash|gegeben|rueckgeld|rückgeld|zurueck|zurück|change|balance|datum|date|zeit|time|bon|beleg|rechnung|terminal|transaktion|trace|auth|iban|bic|ust-id|ustid|tel|telefon|phone|www\.|http|kunden|filiale|öffnungszeiten|oeffnungszeiten)/i.test(line);
 }
@@ -341,24 +361,38 @@ function footerStartIndex(lines) {
   return index === -1 ? lines.length : index;
 }
 
-function findTotalAmount(lines) {
-  const totalCandidates = [];
-  lines.forEach((line, index) => {
-    if (/(betrag|beitrag|summe|sum\b|gesamtbetrag|gesamt|total|final|zu zahlen)/i.test(line) && !/(rueckgeld|rückgeld|change|balance)/i.test(line)) {
-      const sameLineAmounts = amountsInLine(line);
-      totalCandidates.push(...(sameLineAmounts.length ? sameLineAmounts : amountsInLine([lines[index + 1] || "", lines[index - 1] || ""].join(" "))));
-    }
-  });
+function findTotalAmountResult(lines) {
+  for (const [index, line] of lines.entries()) {
+    if (hasTotalKeyword(line) && !isChangeOrTaxLine(line)) {
+      const sameLineAmounts = plausibleTotalAmounts(line);
+      if (sameLineAmounts.length) return { amount: sameLineAmounts.at(-1), confidence: "high", source: "total-keyword" };
 
-  if (totalCandidates.length) return totalCandidates.at(-1);
+      const nearbyAmounts = [lines[index + 1] || "", lines[index - 1] || ""].flatMap(plausibleTotalAmounts);
+      if (nearbyAmounts.length) return { amount: nearbyAmounts.at(-1), confidence: "medium", source: "near-total-keyword" };
+    }
+  }
+
+  const paymentIndex = lines.findIndex(isPaymentLine);
+  if (paymentIndex !== -1) {
+    const paymentWindow = lines.slice(paymentIndex, Math.min(lines.length, paymentIndex + 7));
+    const paymentAmounts = paymentWindow
+      .filter((line) => !/\b\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\b/.test(line))
+      .flatMap(plausibleTotalAmounts)
+      .filter((amount) => amount >= 0.5 && amount < 10000);
+    if (paymentAmounts.length) return { amount: paymentAmounts.at(-1), confidence: "medium", source: "payment-area" };
+  }
 
   const bodyEnd = footerStartIndex(lines);
   const bodyAmounts = lines
     .slice(0, bodyEnd)
-    .filter((line) => !/(tel|telefon|phone|www\.|http|ust|vat|steuer|mwst)/i.test(line))
-    .flatMap(amountsInLine)
+    .filter((line) => !/(tel|telefon|phone|www\.|http|ust|vat|steuer|mwst|\b\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\b)/i.test(line))
+    .flatMap(priceAmountsInLine)
     .filter((amount) => amount > 0 && amount < 500);
-  return bodyAmounts.length ? bodyAmounts.at(-1) : "";
+  return bodyAmounts.length ? { amount: bodyAmounts.at(-1), confidence: "low", source: "last-body-price" } : { amount: "", confidence: "none", source: "" };
+}
+
+function findTotalAmount(lines) {
+  return findTotalAmountResult(lines).amount;
 }
 
 function extractLineItems(lines) {

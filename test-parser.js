@@ -13,6 +13,18 @@ Beitrag 10,30 EUR
 25.04.2026 14:59 T-1D 65119766
 `;
 
+const paymentOnlySample = `
+Milde Satte 11 1,39 B
+Pfand 0,25 B
+Fier a Boden OKT 2.49 A
+Apfel Gala lky 1,79 A
+Supreme R&( 2,79 4
+K-U-N-D-E-N-B-E-L-E G
+Bezahlung VISA PREPAID
+EUR 10,30
+25.04.2026 14:59 T-1D 65119766
+`;
+
 function normalizeAmount(value) {
   if (!value) return "";
   const compact = String(value).replace(/\s/g, "");
@@ -42,20 +54,65 @@ function priceAmountsInLine(line) {
     .filter((amount) => Number.isFinite(amount));
 }
 
-function findTotalAmount(lines) {
-  const totalCandidates = [];
-  lines.forEach((line, index) => {
-    if (/(betrag|beitrag|summe|sum\b|gesamtbetrag|gesamt|total|final|zu zahlen)/i.test(line) && !/(rueckgeld|rückgeld|change|balance)/i.test(line)) {
-      const sameLineAmounts = amountsInLine(line);
-      totalCandidates.push(...(sameLineAmounts.length ? sameLineAmounts : amountsInLine([lines[index + 1] || "", lines[index - 1] || ""].join(" "))));
+function hasTotalKeyword(line) {
+  return /(betrag|beitrag|summe|sum\b|gesamtbetrag|gesamt|total|final|zu zahlen|endsumme|rechnungsbetrag)/i.test(line);
+}
+
+function isPaymentLine(line) {
+  return /(bezahlung|zahlung|bezahlt|visa|prepaid|debit|mastercard|maestro|amex|girocard|karte|card|ec-|barzahlung|cash|paypal|apple pay|google pay|approved)/i.test(line);
+}
+
+function isChangeOrTaxLine(line) {
+  return /(rueckgeld|rückgeld|change|balance|zurueck|zurück|mwst|ust|vat|steuer|tax)/i.test(line);
+}
+
+function plausibleTotalAmounts(line) {
+  if (isChangeOrTaxLine(line)) return [];
+  if (/\b\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\b/.test(line) && !hasTotalKeyword(line) && !/\b(?:eur|usd|gbp|chf|€|\$|£)\b/i.test(line)) {
+    return [];
+  }
+  return amountsInLine(line).filter((amount) => amount > 0 && amount < 10000);
+}
+
+function footerStartIndex(lines) {
+  const index = lines.findIndex((line) => /(rueckgeld|rückgeld|steuer|mwst|ust|vat|datum|date|zeit|time|visa|mastercard|maestro|karte|card|ec-|girocard|bar|cash|gegeben|terminal|transaktion)/i.test(line));
+  return index === -1 ? lines.length : index;
+}
+
+function findTotalAmountResult(lines) {
+  for (const [index, line] of lines.entries()) {
+    if (hasTotalKeyword(line) && !isChangeOrTaxLine(line)) {
+      const sameLineAmounts = plausibleTotalAmounts(line);
+      if (sameLineAmounts.length) return { amount: sameLineAmounts.at(-1), confidence: "high", source: "total-keyword" };
+
+      const nearbyAmounts = [lines[index + 1] || "", lines[index - 1] || ""].flatMap(plausibleTotalAmounts);
+      if (nearbyAmounts.length) return { amount: nearbyAmounts.at(-1), confidence: "medium", source: "near-total-keyword" };
     }
-  });
-  return totalCandidates.at(-1);
+  }
+
+  const paymentIndex = lines.findIndex(isPaymentLine);
+  if (paymentIndex !== -1) {
+    const paymentWindow = lines.slice(paymentIndex, Math.min(lines.length, paymentIndex + 7));
+    const paymentAmounts = paymentWindow
+      .filter((line) => !/\b\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\b/.test(line))
+      .flatMap(plausibleTotalAmounts)
+      .filter((amount) => amount >= 0.5 && amount < 10000);
+    if (paymentAmounts.length) return { amount: paymentAmounts.at(-1), confidence: "medium", source: "payment-area" };
+  }
+
+  const bodyEnd = footerStartIndex(lines);
+  const bodyAmounts = lines
+    .slice(0, bodyEnd)
+    .filter((line) => !/(tel|telefon|phone|www\.|http|ust|vat|steuer|mwst|\b\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\b)/i.test(line))
+    .flatMap(priceAmountsInLine)
+    .filter((amount) => amount > 0 && amount < 500);
+  return bodyAmounts.length ? { amount: bodyAmounts.at(-1), confidence: "low", source: "last-body-price" } : { amount: "", confidence: "none", source: "" };
 }
 
 function mergeParsedReceipt(aiParsed, ruleParsed) {
   const merged = { ...ruleParsed, ...aiParsed };
-  if (ruleParsed.amount !== "" && ruleParsed.amount != null) {
+  const ruleAmountIsConfident = ["high", "medium"].includes(ruleParsed._amount_confidence);
+  if (ruleAmountIsConfident && ruleParsed.amount !== "" && ruleParsed.amount != null) {
     merged.amount = ruleParsed.amount;
   }
   if (Array.isArray(ruleParsed.line_items) && ruleParsed.line_items.length > 0) {
@@ -64,25 +121,33 @@ function mergeParsedReceipt(aiParsed, ruleParsed) {
   return merged;
 }
 
-const lines = sample.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-const total = findTotalAmount(lines);
-if (total !== 10.3) {
-  throw new Error(`Expected 10.3, got ${total}`);
+function linesFrom(text) {
+  return text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
 }
 
-const merged = mergeParsedReceipt(
-  { amount: 2.79, line_items: [{ item_name: "wrong", total_price: 2.79 }] },
-  {
-    amount: total,
-    line_items: [
-      { item_name: "Milde Satte 11", total_price: 1.39 },
-      { item_name: "Pfand", total_price: 0.25 }
-    ]
-  }
-);
+const keywordTotal = findTotalAmountResult(linesFrom(sample));
+if (keywordTotal.amount !== 10.3 || keywordTotal.confidence !== "high") {
+  throw new Error(`Expected high-confidence total 10.3, got ${JSON.stringify(keywordTotal)}`);
+}
 
-if (merged.amount !== 10.3 || merged.line_items.length !== 2) {
-  throw new Error(`Expected rule parser to win. Got ${JSON.stringify(merged)}`);
+const paymentTotal = findTotalAmountResult(linesFrom(paymentOnlySample));
+if (paymentTotal.amount !== 10.3 || paymentTotal.confidence !== "medium") {
+  throw new Error(`Expected payment-area total 10.3, got ${JSON.stringify(paymentTotal)}`);
+}
+
+const weakTotal = findTotalAmountResult(linesFrom("Item one 1,00\nItem two 2,79"));
+if (weakTotal.amount !== 2.79 || weakTotal.confidence !== "low") {
+  throw new Error(`Expected low-confidence fallback 2.79, got ${JSON.stringify(weakTotal)}`);
+}
+
+const mergedWeak = mergeParsedReceipt({ amount: 10.3 }, { amount: 2.79, _amount_confidence: "low" });
+if (mergedWeak.amount !== 10.3) {
+  throw new Error(`Expected AI amount to survive weak rule amount, got ${JSON.stringify(mergedWeak)}`);
+}
+
+const mergedStrong = mergeParsedReceipt({ amount: 2.79 }, { amount: 10.3, _amount_confidence: "high" });
+if (mergedStrong.amount !== 10.3) {
+  throw new Error(`Expected confident rule amount to win, got ${JSON.stringify(mergedStrong)}`);
 }
 
 const weightedLinePrices = priceAmountsInLine("Apfel lose 2 x 0,69 kg 1,38");
@@ -90,4 +155,4 @@ if (weightedLinePrices.length !== 1 || weightedLinePrices[0] !== 1.38) {
   throw new Error(`Expected only rightmost line price 1.38, got ${JSON.stringify(weightedLinePrices)}`);
 }
 
-console.log("Parser regression passed:", total, "items:", merged.line_items.length, "weighted:", weightedLinePrices[0]);
+console.log("Parser regression passed:", keywordTotal, paymentTotal, "weighted:", weightedLinePrices[0]);
