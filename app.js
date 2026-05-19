@@ -2,13 +2,13 @@ const STORAGE_KEY = "receiptflow.expenses.v1";
 const LANGUAGE_KEY = "receiptflow.receiptLanguage.v1";
 const USER_KEY = "receiptflow.user.v1";
 const categoryColors = {
-  Food: "#2f8f68",
-  Travel: "#167d8f",
-  Shopping: "#4b6fb8",
-  Health: "#c0564a",
-  Housing: "#8b6f47",
-  Utilities: "#c38a16",
-  Other: "#66717a"
+  Food: "#2D6A4F",
+  Travel: "#3D6F8E",
+  Shopping: "#8A6F3D",
+  Health: "#A44A3F",
+  Housing: "#6F6256",
+  Utilities: "#B5852E",
+  Other: "#8A8680"
 };
 
 const receiptExamples = [
@@ -195,10 +195,7 @@ function todayISO() {
 
 function setBadge(text, mode = "ready") {
   els.processingBadge.textContent = text;
-  const color = mode === "busy" ? "#fff7e6" : mode === "done" ? "#e8f4ed" : "#eef1ed";
-  const ink = mode === "busy" ? "#8a5d08" : mode === "done" ? "#2f8f68" : "#66717a";
-  els.processingBadge.style.background = color;
-  els.processingBadge.style.color = ink;
+  els.processingBadge.className = `badge ${mode}`;
 }
 
 function setPage(page) {
@@ -240,7 +237,8 @@ function closeMenu() {
 
 function setStep(index) {
   els.steps.forEach((step, stepIndex) => {
-    step.classList.toggle("done", stepIndex <= index);
+    step.classList.toggle("done", stepIndex < index);
+    step.classList.toggle("active", stepIndex === index);
   });
 }
 
@@ -816,7 +814,7 @@ function drawChart(expenses) {
   const size = els.categoryChart.width;
   const center = size / 2;
   const radius = center - 18;
-  const ringWidth = 34;
+  const ringWidth = 16;
   const totals = totalsByCategory(expenses);
   const entries = Object.entries(totals).filter(([, amount]) => amount > 0);
   const grandTotal = entries.reduce((sum, [, amount]) => sum + amount, 0);
@@ -827,17 +825,25 @@ function drawChart(expenses) {
   if (!entries.length) {
     ctx.beginPath();
     ctx.arc(center, center, radius - ringWidth / 2, 0, Math.PI * 2);
-    ctx.strokeStyle = "#eef1ed";
+    ctx.strokeStyle = "#E4E2DE";
     ctx.lineWidth = ringWidth;
     ctx.stroke();
-    ctx.fillStyle = "#66717a";
-    ctx.font = "800 18px system-ui";
+    ctx.fillStyle = "#1A1917";
+    ctx.font = "700 18px 'JetBrains Mono', monospace";
     ctx.textAlign = "center";
     ctx.fillText("€0.00", center, center - 3);
-    ctx.font = "600 13px system-ui";
+    ctx.fillStyle = "#8A8680";
+    ctx.font = "500 12px 'DM Sans', system-ui";
     ctx.fillText("Total spend", center, center + 20);
-    els.chartLegend.innerHTML = '<p class="empty-state">Save expenses to build the chart.</p>';
+    els.chartLegend.innerHTML = `
+      <div class="empty-state compact">
+        <i data-lucide="receipt-text"></i>
+        <p>Save expenses to build the chart.</p>
+        <button class="primary-button compact" type="button" data-page-button="upload">Upload receipt</button>
+      </div>
+    `;
     els.chartTrend.textContent = "Ready for your first receipt";
+    refreshIcons();
     return;
   }
 
@@ -854,22 +860,21 @@ function drawChart(expenses) {
     start += angle;
   });
 
-  ctx.fillStyle = "#182027";
-  ctx.font = "900 24px system-ui";
+  ctx.fillStyle = "#1A1917";
+  ctx.font = "700 22px 'JetBrains Mono', monospace";
   ctx.textAlign = "center";
   ctx.fillText(formatMoney(grandTotal, "EUR"), center, center - 4);
-  ctx.fillStyle = "#66717a";
-  ctx.font = "650 13px system-ui";
+  ctx.fillStyle = "#8A8680";
+  ctx.font = "500 12px 'DM Sans', system-ui";
   ctx.fillText("Total spend", center, center + 22);
 
   els.chartLegend.innerHTML = entries
     .sort((a, b) => b[1] - a[1])
     .map(([category, amount]) => {
-      const color = categoryColors[category] || categoryColors.Other;
       const percent = Math.round((amount / grandTotal) * 100);
       return `
-        <div class="legend-row">
-          <span class="legend-dot" style="background:${color}"></span>
+        <div class="legend-row category-${category.toLowerCase()}">
+          <span class="legend-dot"></span>
           <span>${category}<small>${percent}%</small></span>
           <strong>${formatMoney(amount, "EUR")}</strong>
         </div>
@@ -977,6 +982,14 @@ els.pageButtons.forEach((button) => {
     history.pushState(null, "", `#${page}`);
     setPage(page);
   });
+});
+
+els.chartLegend.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-page-button]");
+  if (!button) return;
+  const page = button.dataset.pageButton;
+  history.pushState(null, "", `#${page}`);
+  setPage(page);
 });
 
 els.authToggles.forEach((button) => {

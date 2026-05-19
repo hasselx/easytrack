@@ -3,9 +3,12 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#182027" />
+    <meta name="theme-color" content="#111410" />
     <title>Receipt-Based Expense Tracker</title>
     <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet" />
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="styles.css" />
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
@@ -403,7 +406,11 @@
           </div>
           </div>
           <div class="transaction-cards" id="transactionCards"></div>
-          <p id="emptyState" class="empty-state">No expenses yet. Upload a receipt or load sample data.</p>
+          <div id="emptyState" class="empty-state">
+            <i data-lucide="receipt-text"></i>
+            <p>No expenses yet. Upload a receipt to start building your spending history.</p>
+            <button class="primary-button compact" type="button" data-page-button="upload">Upload receipt</button>
+          </div>
           </article>
         </section>
 
@@ -411,7 +418,7 @@
           <header class="topbar">
             <div>
               <h1>Settings</h1>
-              <p>Connect OCR services for better receipt extraction.</p>
+              <p>Adjust the receipt language for better extraction.</p>
             </div>
           </header>
 
