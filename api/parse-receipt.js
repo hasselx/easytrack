@@ -141,6 +141,10 @@ function isChangeOrTaxLine(line) {
   return /(rueckgeld|rückgeld|change|balance|zurueck|zurück|mwst|ust|vat|steuer|tax)/i.test(line);
 }
 
+function isSummaryLine(line) {
+  return /(\baldi\s+preis\b|\b\d+\s+artikel\b|kundenbeleg|k-u-n-d-e-n-b-e-l-e-g|kartenzahlung)/i.test(line);
+}
+
 function plausibleTotalAmounts(line) {
   if (isChangeOrTaxLine(line)) return [];
   if (/\b\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\b/.test(line) && !hasTotalKeyword(line) && !/\b(?:eur|usd|gbp|chf|€|\$|£)\b/i.test(line)) {
@@ -150,11 +154,11 @@ function plausibleTotalAmounts(line) {
 }
 
 function isReceiptMetadataLine(line) {
-  return /(summe|gesamt|total|betrag|zu zahlen|subtotal|zwischensumme|mwst|ust|vat|steuer|tax|visa|mastercard|maestro|amex|karte|card|ec-|girocard|bar|cash|gegeben|rueckgeld|rückgeld|zurueck|zurück|change|balance|datum|date|zeit|time|bon|beleg|rechnung|terminal|transaktion|trace|auth|iban|bic|ust-id|ustid|tel|telefon|phone|www\.|http|kunden|filiale|öffnungszeiten|oeffnungszeiten)/i.test(line);
+  return isSummaryLine(line) || /(summe|gesamt|total|betrag|zu zahlen|subtotal|zwischensumme|mwst|ust|vat|steuer|tax|visa|mastercard|maestro|amex|karte|card|ec-|girocard|bar|cash|gegeben|rueckgeld|rückgeld|zurueck|zurück|change|balance|datum|date|zeit|time|bon|beleg|rechnung|terminal|transaktion|trace|auth|iban|bic|ust-id|ustid|tel|telefon|phone|www\.|http|kunden|filiale|öffnungszeiten|oeffnungszeiten)/i.test(line);
 }
 
 function footerStartIndex(lines) {
-  const index = lines.findIndex((line) => /(rueckgeld|rückgeld|steuer|mwst|ust|vat|datum|date|zeit|time|visa|mastercard|maestro|karte|card|ec-|girocard|bar|cash|gegeben|terminal|transaktion)/i.test(line));
+  const index = lines.findIndex((line) => isSummaryLine(line) || /(rueckgeld|rückgeld|steuer|mwst|ust|vat|datum|date|zeit|time|visa|mastercard|maestro|karte|card|ec-|girocard|bar|cash|gegeben|terminal|transaktion)/i.test(line));
   return index === -1 ? lines.length : index;
 }
 
@@ -196,30 +200,63 @@ function extractLineItems(lines) {
   const items = [];
   const amountPattern = /(?:eur|usd|gbp|chf|\$|£)?\s*(\d{1,4}(?:[ .]\d{3})*(?:[,.]\d{2,3}))\s*(?:eur|usd|gbp|chf|\$|£)?/gi;
 
-  lines.slice(0, footerStartIndex(lines)).forEach((line) => {
-    if (isReceiptMetadataLine(line)) return;
-    const amounts = priceAmountsInLine(line);
-    const totalPrice = amounts.at(-1);
-    if (!totalPrice || totalPrice > 200) return;
-
-    const quantityMatch = line.match(/(\d+(?:[,.]\d+)?)\s*[*xX]\s*\d{1,4}(?:[,.]\d{2})/);
-    const quantity = quantityMatch ? Number(quantityMatch[1].replace(",", ".")) : 1;
-    const itemName = line
+  const cleanItemName = (line) =>
+    line
       .replace(amountPattern, "")
-      .replace(/\d+(?:[,.]\d+)?\s*[*xX]\s*\d{1,4}(?:[,.]\d{2})/g, "")
-      .replace(/^\d{3,}\s+/, "")
+      .replace(/\d+(?:[,.]\d+)?\s*[*xX]\s*\d{1,4}(?:[,.]\d{2,3})/g, "")
+      .replace(/^\s*[A-Z]{0,3}\d{3,}[A-Z0-9-]*\s+/i, "")
+      .replace(/\b(?:FOR|VON|STK|KG|G|L|ML)\b/gi, " ")
+      .replace(/\b[A-Z]\b\s*$/g, "")
       .replace(/[^\wÄÖÜäöüß .-]/g, " ")
       .replace(/\s{2,}/g, " ")
       .trim();
 
-    if (!/[a-zA-ZÄÖÜäöüß]{2,}/.test(itemName) || itemName.replace(/[^a-zA-ZÄÖÜäöüß]/g, "").length < 3 || !/[aeiouäöüAEIOUÄÖÜ]/.test(itemName)) return;
+  const isLikelyItemName = (itemName) =>
+    /[a-zA-ZÄÖÜäöüß]{2,}/.test(itemName) &&
+    itemName.replace(/[^a-zA-ZÄÖÜäöüß]/g, "").length >= 3 &&
+    /[aeiouäöüAEIOUÄÖÜ]/.test(itemName) &&
+    !isReceiptMetadataLine(itemName);
+
+  const pushItem = (itemName, quantity, totalPrice) => {
+    if (!totalPrice || totalPrice > 200 || !isLikelyItemName(itemName)) return;
     items.push({
       item_name: itemName || "[Unclear]",
       item_name_en: itemName || "[Unclear]",
       quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
-      total_price: totalPrice,
+      total_price: Number(totalPrice.toFixed(2)),
       unclear: !itemName
     });
+  };
+
+  let pendingName = "";
+  lines.slice(0, footerStartIndex(lines)).forEach((line) => {
+    if (isReceiptMetadataLine(line)) {
+      pendingName = "";
+      return;
+    }
+
+    const multiplierMatch = line.match(/(\d+(?:[,.]\d+)?)\s*[*xX]\s*(\d{1,4}(?:[,.]\d{2,3}))/);
+    const amounts = priceAmountsInLine(line);
+    if (!amounts.length && multiplierMatch && pendingName) {
+      const quantity = Number(multiplierMatch[1].replace(",", "."));
+      const unitPrice = normalizeAmount(multiplierMatch[2]);
+      pushItem(pendingName, quantity, quantity * unitPrice);
+      pendingName = "";
+      return;
+    }
+
+    const totalPrice = amounts.at(-1);
+    if (!totalPrice) {
+      const candidateName = cleanItemName(line);
+      if (isLikelyItemName(candidateName)) pendingName = candidateName;
+      return;
+    }
+    if (totalPrice > 200) return;
+
+    const quantityMatch = line.match(/(\d+(?:[,.]\d+)?)\s*[*xX]\s*\d{1,4}(?:[,.]\d{2})/);
+    const quantity = quantityMatch ? Number(quantityMatch[1].replace(",", ".")) : 1;
+    pushItem(cleanItemName(line), quantity, totalPrice);
+    pendingName = "";
   });
 
   return items;
