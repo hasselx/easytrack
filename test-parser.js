@@ -54,6 +54,7 @@ Wei. Sandwi. Toast 1,09 A
 Solaya Dürüm Wr 1,99 A
 Bodylotion Q10 1,95 B
 Preisvorteil -0,20
+Preisvor tal sad - 0,20
 Hähnchenbrustfilet 9,99 A
 1€ DP Grille-0532217 1,00 B
 Sattelbezug-0500524 4,99 B
@@ -109,11 +110,25 @@ function isSummaryLine(line) {
 }
 
 function isDiscountLine(line) {
-  return /(preisvorteil|preisvortell|rabatt|discount|coupon|gutschein|ersparnis|gespart)/i.test(line);
+  const normalized = line
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9-]+/g, " ");
+  return (
+    /(preisvorteil|preisvortell|rabatt|discount|coupon|gutschein|ersparnis|gespart)/i.test(line) ||
+    /preis\s*v[o0]r/.test(normalized) ||
+    /v[o0]r\s*teil/.test(normalized) ||
+    /preis.{0,8}teil/.test(normalized)
+  );
+}
+
+function hasNegativeAmount(line) {
+  return /-\s*\d{1,4}(?:[,.]\d{2,3})/.test(line);
 }
 
 function plausibleTotalAmounts(line) {
-  if (isChangeOrTaxLine(line) || isDiscountLine(line)) return [];
+  if (isChangeOrTaxLine(line) || isDiscountLine(line) || hasNegativeAmount(line)) return [];
   if (/\b\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\b/.test(line) && !hasTotalKeyword(line) && !/\b(?:eur|usd|gbp|chf|€|\$|£)\b/i.test(line)) {
     return [];
   }
@@ -202,7 +217,7 @@ function extractLineItems(lines) {
 
   let pendingName = "";
   lines.slice(0, footerStartIndex(lines)).forEach((line) => {
-    if (isReceiptMetadataLine(line)) {
+    if (isReceiptMetadataLine(line) || hasNegativeAmount(line)) {
       pendingName = "";
       return;
     }
@@ -282,7 +297,7 @@ const lidlItems = extractLineItems(lidlLines);
 if (lidlTotal.amount !== 29.34) {
   throw new Error(`Expected Lidl total 29.34, got ${JSON.stringify(lidlTotal)}`);
 }
-if (lidlItems.some((item) => /preisvorteil/i.test(item.item_name))) {
+if (lidlItems.some((item) => /preis|vorteil|preisvor/i.test(item.item_name))) {
   throw new Error(`Preisvorteil should not be a line item, got ${JSON.stringify(lidlItems)}`);
 }
 if (!lidlItems.some((item) => /hähnchenbrustfilet/i.test(item.item_name))) {

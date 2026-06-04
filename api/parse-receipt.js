@@ -146,11 +146,25 @@ function isSummaryLine(line) {
 }
 
 function isDiscountLine(line) {
-  return /(preisvorteil|preisvortell|rabatt|discount|coupon|gutschein|ersparnis|gespart)/i.test(line);
+  const normalized = line
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9-]+/g, " ");
+  return (
+    /(preisvorteil|preisvortell|rabatt|discount|coupon|gutschein|ersparnis|gespart)/i.test(line) ||
+    /preis\s*v[o0]r/.test(normalized) ||
+    /v[o0]r\s*teil/.test(normalized) ||
+    /preis.{0,8}teil/.test(normalized)
+  );
+}
+
+function hasNegativeAmount(line) {
+  return /-\s*\d{1,4}(?:[,.]\d{2,3})/.test(line);
 }
 
 function plausibleTotalAmounts(line) {
-  if (isChangeOrTaxLine(line) || isDiscountLine(line)) return [];
+  if (isChangeOrTaxLine(line) || isDiscountLine(line) || hasNegativeAmount(line)) return [];
   if (/\b\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\b/.test(line) && !hasTotalKeyword(line) && !/\b(?:eur|usd|gbp|chf|€|\$|£)\b/i.test(line)) {
     return [];
   }
@@ -234,7 +248,7 @@ function extractLineItems(lines) {
 
   let pendingName = "";
   lines.slice(0, footerStartIndex(lines)).forEach((line) => {
-    if (isReceiptMetadataLine(line)) {
+    if (isReceiptMetadataLine(line) || hasNegativeAmount(line)) {
       pendingName = "";
       return;
     }
