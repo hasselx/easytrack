@@ -39,6 +39,30 @@ A 07,0% Netto 2,78 MwSt 0,19
 x8626 BC86/006/802 19.05.26 15:50
 `;
 
+const lidlDiscountSample = `
+LIDL
+Hornstr. 23
+54294 Trier
+EUR
+Apfel rot,süß-säuerl 1,99 A
+Speisekartoffeln 2,19 A
+Mövenpick Mango 3,99 A
+Preisvorteil -2,22
+Erdbeer-Konfitüre 1,59 A
+Paprika Chips 0,99 A
+Wei. Sandwi. Toast 1,09 A
+Solaya Dürüm Wr 1,99 A
+Bodylotion Q10 1,95 B
+Preisvorteil -0,20
+Hähnchenbrustfilet 9,99 A
+1€ DP Grille-0532217 1,00 B
+Sattelbezug-0500524 4,99 B
+Zu zahlen 29,34
+Kreditkarte 29,34
+Gesamter Preisvorteil
+2,42 EUR gespart
+`;
+
 function normalizeAmount(value) {
   if (!value) return "";
   const compact = String(value).replace(/\s/g, "");
@@ -77,15 +101,19 @@ function isPaymentLine(line) {
 }
 
 function isChangeOrTaxLine(line) {
-  return /(rueckgeld|rückgeld|change|balance|zurueck|zurück|mwst|ust|vat|steuer|tax)/i.test(line);
+  return /(rueckgeld|rückgeld|change|balance|zurueck|zurück|mwst|\bust\b|\bvat\b|steuer|\btax\b)/i.test(line);
 }
 
 function isSummaryLine(line) {
   return /(\baldi\s+preis\b|\b\d+\s+artikel\b|kundenbeleg|k-u-n-d-e-n-b-e-l-e-g|kartenzahlung)/i.test(line);
 }
 
+function isDiscountLine(line) {
+  return /(preisvorteil|preisvortell|rabatt|discount|coupon|gutschein|ersparnis|gespart)/i.test(line);
+}
+
 function plausibleTotalAmounts(line) {
-  if (isChangeOrTaxLine(line)) return [];
+  if (isChangeOrTaxLine(line) || isDiscountLine(line)) return [];
   if (/\b\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\b/.test(line) && !hasTotalKeyword(line) && !/\b(?:eur|usd|gbp|chf|€|\$|£)\b/i.test(line)) {
     return [];
   }
@@ -93,11 +121,11 @@ function plausibleTotalAmounts(line) {
 }
 
 function isReceiptMetadataLine(line) {
-  return isSummaryLine(line) || /(summe|gesamt|total|betrag|zu zahlen|subtotal|zwischensumme|mwst|ust|vat|steuer|tax|visa|mastercard|maestro|amex|karte|card|ec-|girocard|bar|cash|gegeben|rueckgeld|rückgeld|zurueck|zurück|change|balance|datum|date|zeit|time|bon|beleg|rechnung|terminal|transaktion|trace|auth|iban|bic|ust-id|ustid|tel|telefon|phone|www\.|http|kunden|filiale|öffnungszeiten|oeffnungszeiten)/i.test(line);
+  return isSummaryLine(line) || isDiscountLine(line) || /(summe|gesamt|total|betrag|zu zahlen|subtotal|zwischensumme|mwst|\bust\b|\bvat\b|steuer|\btax\b|visa|mastercard|maestro|amex|karte|card|\bec-|girocard|bar|cash|gegeben|rueckgeld|rückgeld|zurueck|zurück|change|balance|datum|date|zeit|time|bon|beleg|rechnung|terminal|transaktion|trace|auth|iban|bic|ust-id|ustid|tel|telefon|phone|www\.|http|kunden|filiale|öffnungszeiten|oeffnungszeiten)/i.test(line);
 }
 
 function footerStartIndex(lines) {
-  const index = lines.findIndex((line) => isSummaryLine(line) || /(rueckgeld|rückgeld|steuer|mwst|ust|vat|datum|date|zeit|time|visa|mastercard|maestro|karte|card|ec-|girocard|bar|cash|gegeben|terminal|transaktion)/i.test(line));
+  const index = lines.findIndex((line) => isSummaryLine(line) || /(rueckgeld|rückgeld|steuer|mwst|\bust\b|\bvat\b|datum|date|zeit|time|visa|mastercard|maestro|karte|card|\bec-|girocard|bar|cash|gegeben|terminal|transaktion)/i.test(line));
   return index === -1 ? lines.length : index;
 }
 
@@ -125,7 +153,7 @@ function findTotalAmountResult(lines) {
   const bodyEnd = footerStartIndex(lines);
   const bodyAmounts = lines
     .slice(0, bodyEnd)
-    .filter((line) => !/(tel|telefon|phone|www\.|http|ust|vat|steuer|mwst|\b\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\b)/i.test(line))
+    .filter((line) => !/(tel|telefon|phone|www\.|http|\bust\b|\bvat\b|steuer|mwst|\b\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\b)/i.test(line))
     .flatMap(priceAmountsInLine)
     .filter((amount) => amount > 0 && amount < 500);
   return bodyAmounts.length ? { amount: bodyAmounts.at(-1), confidence: "low", source: "last-body-price" } : { amount: "", confidence: "none", source: "" };
@@ -159,7 +187,7 @@ function extractLineItems(lines) {
   const isLikelyItemName = (itemName) =>
     /[a-zA-ZÄÖÜäöüß]{2,}/.test(itemName) &&
     itemName.replace(/[^a-zA-ZÄÖÜäöüß]/g, "").length >= 3 &&
-    /[aeiouäöüAEIOUÄÖÜ]/.test(itemName) &&
+    /[aeiouäöüAEIOUÄÖÜ]/i.test(itemName) &&
     !isReceiptMetadataLine(itemName);
   const pushItem = (itemName, quantity, totalPrice) => {
     if (!totalPrice || totalPrice > 200 || !isLikelyItemName(itemName)) return;
@@ -248,4 +276,17 @@ if (aldiItems.some((item) => /aldi\s+preis/i.test(item.item_name))) {
   throw new Error(`ALDI PREIS should not be a line item, got ${JSON.stringify(aldiItems)}`);
 }
 
-console.log("Parser regression passed:", keywordTotal, paymentTotal, "weighted:", weightedLinePrices[0], "aldi items:", aldiItems.length);
+const lidlLines = linesFrom(lidlDiscountSample);
+const lidlTotal = findTotalAmountResult(lidlLines);
+const lidlItems = extractLineItems(lidlLines);
+if (lidlTotal.amount !== 29.34) {
+  throw new Error(`Expected Lidl total 29.34, got ${JSON.stringify(lidlTotal)}`);
+}
+if (lidlItems.some((item) => /preisvorteil/i.test(item.item_name))) {
+  throw new Error(`Preisvorteil should not be a line item, got ${JSON.stringify(lidlItems)}`);
+}
+if (!lidlItems.some((item) => /hähnchenbrustfilet/i.test(item.item_name))) {
+  throw new Error(`Discount line must not stop later item extraction, got ${JSON.stringify(lidlItems)}`);
+}
+
+console.log("Parser regression passed:", keywordTotal, paymentTotal, "weighted:", weightedLinePrices[0], "aldi items:", aldiItems.length, "lidl items:", lidlItems.length);

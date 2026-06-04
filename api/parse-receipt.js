@@ -138,15 +138,19 @@ function isPaymentLine(line) {
 }
 
 function isChangeOrTaxLine(line) {
-  return /(rueckgeld|rückgeld|change|balance|zurueck|zurück|mwst|ust|vat|steuer|tax)/i.test(line);
+  return /(rueckgeld|rückgeld|change|balance|zurueck|zurück|mwst|\bust\b|\bvat\b|steuer|\btax\b)/i.test(line);
 }
 
 function isSummaryLine(line) {
   return /(\baldi\s+preis\b|\b\d+\s+artikel\b|kundenbeleg|k-u-n-d-e-n-b-e-l-e-g|kartenzahlung)/i.test(line);
 }
 
+function isDiscountLine(line) {
+  return /(preisvorteil|preisvortell|rabatt|discount|coupon|gutschein|ersparnis|gespart)/i.test(line);
+}
+
 function plausibleTotalAmounts(line) {
-  if (isChangeOrTaxLine(line)) return [];
+  if (isChangeOrTaxLine(line) || isDiscountLine(line)) return [];
   if (/\b\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\b/.test(line) && !hasTotalKeyword(line) && !/\b(?:eur|usd|gbp|chf|€|\$|£)\b/i.test(line)) {
     return [];
   }
@@ -154,11 +158,11 @@ function plausibleTotalAmounts(line) {
 }
 
 function isReceiptMetadataLine(line) {
-  return isSummaryLine(line) || /(summe|gesamt|total|betrag|zu zahlen|subtotal|zwischensumme|mwst|ust|vat|steuer|tax|visa|mastercard|maestro|amex|karte|card|ec-|girocard|bar|cash|gegeben|rueckgeld|rückgeld|zurueck|zurück|change|balance|datum|date|zeit|time|bon|beleg|rechnung|terminal|transaktion|trace|auth|iban|bic|ust-id|ustid|tel|telefon|phone|www\.|http|kunden|filiale|öffnungszeiten|oeffnungszeiten)/i.test(line);
+  return isSummaryLine(line) || isDiscountLine(line) || /(summe|gesamt|total|betrag|zu zahlen|subtotal|zwischensumme|mwst|\bust\b|\bvat\b|steuer|\btax\b|visa|mastercard|maestro|amex|karte|card|\bec-|girocard|bar|cash|gegeben|rueckgeld|rückgeld|zurueck|zurück|change|balance|datum|date|zeit|time|bon|beleg|rechnung|terminal|transaktion|trace|auth|iban|bic|ust-id|ustid|tel|telefon|phone|www\.|http|kunden|filiale|öffnungszeiten|oeffnungszeiten)/i.test(line);
 }
 
 function footerStartIndex(lines) {
-  const index = lines.findIndex((line) => isSummaryLine(line) || /(rueckgeld|rückgeld|steuer|mwst|ust|vat|datum|date|zeit|time|visa|mastercard|maestro|karte|card|ec-|girocard|bar|cash|gegeben|terminal|transaktion)/i.test(line));
+  const index = lines.findIndex((line) => isSummaryLine(line) || /(rueckgeld|rückgeld|steuer|mwst|\bust\b|\bvat\b|datum|date|zeit|time|visa|mastercard|maestro|karte|card|\bec-|girocard|bar|cash|gegeben|terminal|transaktion)/i.test(line));
   return index === -1 ? lines.length : index;
 }
 
@@ -186,7 +190,7 @@ function findTotalAmountResult(lines) {
   const bodyEnd = footerStartIndex(lines);
   const bodyAmounts = lines
     .slice(0, bodyEnd)
-    .filter((line) => !/(tel|telefon|phone|www\.|http|ust|vat|steuer|mwst|\b\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\b)/i.test(line))
+    .filter((line) => !/(tel|telefon|phone|www\.|http|\bust\b|\bvat\b|steuer|mwst|\b\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\b)/i.test(line))
     .flatMap(priceAmountsInLine)
     .filter((amount) => amount > 0 && amount < 500);
   return bodyAmounts.length ? { amount: bodyAmounts.at(-1), confidence: "low", source: "last-body-price" } : { amount: "", confidence: "none", source: "" };
@@ -214,7 +218,7 @@ function extractLineItems(lines) {
   const isLikelyItemName = (itemName) =>
     /[a-zA-ZÄÖÜäöüß]{2,}/.test(itemName) &&
     itemName.replace(/[^a-zA-ZÄÖÜäöüß]/g, "").length >= 3 &&
-    /[aeiouäöüAEIOUÄÖÜ]/.test(itemName) &&
+    /[aeiouäöüAEIOUÄÖÜ]/i.test(itemName) &&
     !isReceiptMetadataLine(itemName);
 
   const pushItem = (itemName, quantity, totalPrice) => {
@@ -274,7 +278,7 @@ function parseReceiptByRules(text, fileName = "") {
   const joined = lines.join("\n");
   const merchant = lines.find((line) => !isReceiptMetadataLine(line) && /[a-zA-ZÄÖÜäöüß]{2,}/.test(line)) || fileName.replace(/\.[^.]+$/, "") || "Unknown merchant";
   const dateMatch = joined.match(/\d{4}[-/.]\d{1,2}[-/.]\d{1,2}|\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}/);
-  const taxLine = lines.find((line) => /(tax|mwst|ust|vat)/i.test(line));
+  const taxLine = lines.find((line) => /(\btax\b|mwst|\bust\b|\bvat\b)/i.test(line));
   const cashLine = lines.find((line) => /(cash|bar|gegeben|received|tendered)/i.test(line));
   const changeLine = lines.find((line) => /(change|rueckgeld|rückgeld|balance|zurueck|zurück)/i.test(line));
   const paymentLine = lines.find((line) => /(visa|mastercard|maestro|amex|card|karte|ec|cash|bar|paypal|apple pay|google pay)/i.test(line));
